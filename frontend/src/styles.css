@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root {font-family:'Inter',system-ui,sans-serif;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;background:#f8fafc;color:#0f172a;}
+* {box-sizing:border-box;}
+body {margin:0;}
+button,input,select,textarea {font:inherit;}
+button {cursor:pointer;}
+button:disabled {cursor:not-allowed;opacity:.6;}
+:focus-visible {outline:3px solid #93c5fd;outline-offset:3px;}
+::selection {background:#dbeafe;color:#1e3a8a;}
+.font-display {font-family:'Plus Jakarta Sans','Inter',sans-serif;}
+.brand-mark {height:39px;width:39px;display:inline-flex;align-items:center;justify-content:center;color:#2563eb;border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;}
+.auth-editorial {background:linear-gradient(180deg,#f1f6ff 0%,#f8fafc 75%);}
+.auth-editorial::before {content:'';position:absolute;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(#a8c4e633 1px,transparent 1px),linear-gradient(90deg,#a8c4e633 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000,transparent 80%);}
+.learning-note {border:1px solid #dbeafe;border-radius:12px;box-shadow:0 9px 25px rgba(30,64,175,.045);}
+.form-input {display:block;width:100%;height:45px;padding:0 13px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-size:13.5px;outline:none;transition:border-color .15s,box-shadow .15s;}
+.form-input:focus {border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe;}
+.form-input::placeholder {color:#94a3b8;}
+.primary-button,.secondary-button {display:inline-flex;align-items:center;gap:9px;border-radius:8px;font-size:13.5px;font-weight:700;transition:background .15s;}
+.primary-button {background:#2563eb;color:#fff;padding:11px 16px;}
+.primary-button:hover {background:#1d4ed8;}
+.secondary-button {background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:10px 14px;}
+.secondary-button:hover {background:#dbeafe;}
+.study-card {border:1px solid #e2e8f0;background:#fff;border-radius:12px;transition:border-color .16s,box-shadow .16s;}
+.study-card:hover {border-color:#93c5fd;box-shadow:0 7px 20px rgba(37,99,235,.065);}
+.ai-markdown>:first-child {margin-top:0;}
+.ai-markdown>:last-child {margin-bottom:0;}
+.ai-markdown p {margin:.6rem 0;}
+.ai-markdown h1,.ai-markdown h2,.ai-markdown h3,.ai-markdown h4 {font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;line-height:1.4;color:#0f172a;margin:1.3rem 0 .45rem;}
+.ai-markdown h1 {font-size:1.3rem;}
+.ai-markdown h2 {font-size:1.13rem;}
+.ai-markdown h3 {font-size:1.03rem;}
+.ai-markdown ul,.ai-markdown ol {margin:.6rem 0;padding-left:1.5rem;}
+.ai-markdown ul {list-style:disc;}
+.ai-markdown ol {list-style:decimal;}
+.ai-markdown li {margin:.3rem 0;padding-left:.12rem;}
+.ai-markdown li>p {margin:.1rem 0;}
+.ai-markdown input[type='checkbox'] {margin-right:6px;}
+.ai-markdown strong {font-weight:750;color:#0f172a;}
+.ai-markdown :not(pre)>code {background:#eef2ff;color:#1e40af;padding:2px 5px;border-radius:4px;font-size:.9em;overflow-wrap:anywhere;}
+.ai-markdown pre {margin:.9rem 0;overflow-x:auto;background:#0f172a;color:#e2e8f0;padding:17px 18px;border-radius:9px;font-size:.85rem;line-height:1.65;}
+.ai-markdown pre code {padding:0!important;background:none!important;color:inherit!important;}
+.ai-markdown blockquote {margin:.9rem 0;border-left:3px solid #93c5fd;background:#f8fafc;padding:.45rem .85rem;color:#475569;}
+.ai-markdown a {color:#1d4ed8;text-decoration:underline;text-underline-offset:2px;}
+.ai-markdown a:hover {color:#1e40af;}
+.ai-markdown table {display:block;width:100%;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:1rem 0;font-size:.9em;}
+.ai-markdown td,.ai-markdown th {border:1px solid #e2e8f0;padding:7px 11px;text-align:left;white-space:nowrap;}
+.ai-markdown th {background:#eff6ff;color:#0f172a;font-weight:750;}
+.ai-markdown .katex-display {max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.5rem 0;margin:.65rem 0;}
+.ai-markdown .katex {font-size:1.07em;}
+.ai-markdown hr {border:none;border-top:1px solid #e2e8f0;margin:1.25rem 0;}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important;}}
