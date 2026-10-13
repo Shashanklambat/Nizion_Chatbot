@@ -52,3 +52,18 @@ button:disabled {cursor:not-allowed;opacity:.6;}
 .ai-markdown .katex {font-size:1.07em;}
 .ai-markdown hr {border:none;border-top:1px solid #e2e8f0;margin:1.25rem 0;}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+
+/* Mobile-first signup and sign-in: comfortable touch targets, no iOS zoom, no horizontal overflow. */
+.auth-shell {width:100%;overflow-x:clip;}
+.auth-right {width:100%;}
+.auth-right .form-input {min-height:48px;height:48px;font-size:16px;}
+.auth-right .primary-button,.auth-right .secondary-button {min-height:44px;}
+@media (max-width:639px) {
+  .auth-right {justify-content:flex-start;}
+  .auth-right .brand-mark {height:36px;width:36px;}
+  .auth-right form {margin-top:2px;}
+}
+@media (max-width:359px) {
+  .auth-right {padding-left:16px;padding-right:16px;}
+  .auth-right .form-input {padding-left:10px;padding-right:8px;}
+}
