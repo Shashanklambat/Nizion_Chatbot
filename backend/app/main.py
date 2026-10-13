@@ -1,15 +1,19 @@
 """HTTP API for registration, profiles, conversations, and AI responses."""
 import os
+import json
+import secrets
 from datetime import timedelta, timezone
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from .ai import generate_answer
+from .ai import generate_answer, stream_answer
 from .database import Base, engine, get_db
 from .db_guards import install_postgres_guards
 from .models import Conversation, Message, PhoneChallenge, User, utcnow
@@ -138,7 +142,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
         if not challenge or not challenge.verified_at or challenge.used_at:
             raise HTTPException(status_code=403, detail="A fresh WhatsApp verification is required")
     user = User(
-        username=data.username.strip().lower(),
+        username=data.username.strip().lower() if data.username else f"student_{secrets.token_hex(10)}",
         full_name=data.full_name.strip(),
         email=str(data.email).lower(),
         whatsapp_number=data.whatsapp_number,
@@ -280,3 +284,56 @@ async def ask_question(
         "user_message": user_message,
         "assistant_message": assistant_message,
     }
+
+
+@app.post("/api/conversations/{conversation_id}/stream")
+async def ask_question_stream(
+    conversation_id: int,
+    data: QuestionRequest,
+    student: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Stream answer fragments as NDJSON. Save messages only after successful completion.
+
+    Existing /messages endpoint is retained for older clients and tests.
+    """
+    conversation = owned_conversation(conversation_id, student, db)
+    question = data.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="Question cannot be blank")
+    previous = db.scalars(
+        select(Message).where(Message.conversation_id == conversation.id)
+        .order_by(Message.id.desc()).limit(12)
+    ).all()
+    history = [{"role": item.role, "content": item.content} for item in reversed(previous)]
+
+    async def produce():
+        parts = []
+        try:
+            async for chunk in stream_answer(student, history, question):
+                parts.append(chunk)
+                yield json.dumps({"type": "delta", "text": chunk}) + "\n"
+            answer = "".join(parts).strip()
+            if not answer:
+                raise HTTPException(status_code=502, detail="The AI returned an empty answer. Please retry.")
+            user_message = Message(conversation_id=conversation.id, role="user", content=question)
+            assistant_message = Message(conversation_id=conversation.id, role="assistant", content=answer)
+            db.add_all([user_message, assistant_message])
+            if conversation.title == "New chat":
+                conversation.title = question[:65] + ("…" if len(question) > 65 else "")
+            conversation.updated_at = utcnow()
+            db.commit()
+            db.refresh(user_message)
+            db.refresh(assistant_message)
+            yield json.dumps({"type": "done", "user_message": jsonable_encoder(user_message),
+                              "assistant_message": jsonable_encoder(assistant_message)}) + "\n"
+        except HTTPException as exc:
+            db.rollback()
+            yield json.dumps({"type": "error", "message": exc.detail}) + "\n"
+        except Exception:
+            db.rollback()
+            yield json.dumps({"type": "error", "message": "Unable to finish the answer. Please try again."}) + "\n"
+
+    return StreamingResponse(produce(), media_type="application/x-ndjson",
+                             headers={"Cache-Control": "no-cache, no-transform",
+                                      "X-Accel-Buffering": "no"})

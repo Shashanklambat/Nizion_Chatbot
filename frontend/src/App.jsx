@@ -10,7 +10,7 @@ import {
   Menu, MessageCircle, Plus, Settings2, ShieldCheck, Sparkles, Trash2, X,
   ChevronDown, Eye, EyeOff, Search, UserRound, Mail, Mic, MicOff, Calculator, FlaskConical, BookText, Globe2, MessageSquareMore, Lock, ArrowLeft,
 } from 'lucide-react';
-import { request } from './api';
+import { request, streamQuestion } from './api';
 import { countryCodes } from './countryCodes';
 
 const grades = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -25,6 +25,24 @@ const suggestions = [
   { subject: 'Biology', question: 'How do plants make their food?', symbol: '03', subtitle: 'Nature made simple' },
   { subject: 'English', question: 'Help me write a short story.', symbol: '04', subtitle: 'Build your words' },
 ];
+
+// Keep navigation inside the mobile web app, including Android's system Back button.
+// Each forward view creates a history entry; popstate restores the previous view.
+const SM_HISTORY_KEY = '__studymate_nav';
+function saveNavigation(area, page, extra = {}, replace = false) {
+  const data = { [SM_HISTORY_KEY]: true, area, page, ...extra };
+  window.history[replace ? 'replaceState' : 'pushState'](data, '');
+  return data;
+}
+
+// Normalize math from Groq and already-saved chats BEFORE Markdown processing.
+// react-markdown understands $...$ and $$...$$, but not the model's \[...\] / \(...\).
+export function normalizeStudyMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_match, body) => `\n\n$$\n${body.trim()}\n$$\n\n`)
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_match, body) => `$${body.trim()}$`);
+}
 
 function Brand() {
   return (
@@ -150,6 +168,34 @@ function AuthScreen({ onAuth }) {
   const [otpEnabled, setOtpEnabled] = useState(null); // Fail closed if registration config is unavailable.
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [exitWarning, setExitWarning] = useState(false);
+  const authRouteRef = useRef({ tab: 'login', step: 1 });
+  const authHistoryInitialized = useRef(false);
+  const mayExitRef = useRef(false);
+
+  useEffect(() => {
+    if (!authHistoryInitialized.current) {
+      saveNavigation('auth', 'login');
+      authHistoryInitialized.current = true;
+    }
+    const onBack = (event) => {
+      if (mayExitRef.current) return;
+      const state = event.state;
+      if (state?.[SM_HISTORY_KEY] && state.area === 'auth') {
+        const nextTab = state.page === 'register' ? 'register' : 'login';
+        const nextStep = nextTab === 'register' ? (state.step || 1) : 1;
+        authRouteRef.current = { tab: nextTab, step: nextStep };
+        setTab(nextTab); setSignupStep(nextStep); setError('');
+      } else {
+        const previous = authRouteRef.current;
+        saveNavigation('auth', previous.tab, { step: previous.step });
+        setExitWarning(true);
+      }
+    };
+    window.addEventListener('popstate', onBack);
+    return () => window.removeEventListener('popstate', onBack);
+  }, []);
+  function confirmExit() { mayExitRef.current = true; window.history.go(-2); }
 
   useEffect(() => {
     let active = true;
@@ -164,6 +210,8 @@ function AuthScreen({ onAuth }) {
 
   function switchScreen(next) {
     if (busy) return;
+    authRouteRef.current = { tab: next, step: 1 };
+    saveNavigation('auth', next, { step: 1 });
     setTab(next);
     setSignupStep(1);
     setForm(previous => ({ ...previous, username: '', password: '' }));
@@ -223,6 +271,8 @@ function AuthScreen({ onAuth }) {
     }
     if (tab === 'register' && signupStep === 1) {
       // Native required/email/tel/select validation runs before onSubmit.
+      authRouteRef.current = { tab: 'register', step: 2 };
+      saveNavigation('auth', 'register', { step: 2 });
       setSignupStep(2);
       setError('');
       window.scrollTo(0, 0);
@@ -245,7 +295,7 @@ function AuthScreen({ onAuth }) {
       const data = await request(tab === 'register' ? '/auth/register' : '/auth/login', {
         method: 'POST',
         body: tab === 'register'
-          ? { ...form, whatsapp_number: fullPhoneNumber, grade: Number(form.grade),
+          ? { ...form, username: undefined, whatsapp_number: fullPhoneNumber, grade: Number(form.grade),
               ...(otpEnabled ? { verification_ticket: verification.ticket } : {}) }
           : { username: form.username, password: form.password },
       });
@@ -256,8 +306,8 @@ function AuthScreen({ onAuth }) {
 
   const isRegister = tab === 'register';
   function previousStep() {
-    if (signupStep === 2) { setSignupStep(1); setError(''); }
-    else switchScreen('login');
+    if (signupStep === 2 || tab === 'register') window.history.back();
+    else setExitWarning(true);
   }
   return (
     <div className={`auth-shell ${isRegister ? 'auth-register' : 'auth-login'}`}>
@@ -293,7 +343,7 @@ function AuthScreen({ onAuth }) {
             <div className="auth-register-intro">
               <h1 className="font-display">Create Your Account</h1>
               <p className="auth-register-step">Step {signupStep} of 2 – {signupStep === 1 ? 'Student Details' : 'Account Setup'}</p>
-              <p className="auth-register-description">{signupStep === 1 ? "We'll use this information to give you the best learning experience." : 'Create a username and password to access your account.'}</p>
+              <p className="auth-register-description">{signupStep === 1 ? "We'll use this information to give you the best learning experience." : 'Enter your email and create a secure password to access your account.'}</p>
             </div>
           </>}
           <div className="auth-card">
@@ -303,8 +353,8 @@ function AuthScreen({ onAuth }) {
             </div>}
             <form className="auth-form" onSubmit={submit}>
               {!isRegister && <>
-                <Field label="Username or email" icon={<UserRound size={20}/>}>
-                  <input required maxLength={254} className="form-input" autoComplete="username" placeholder="Enter your username or email" value={form.username} onChange={e => change('username', e.target.value)}/>
+                <Field label="Email address" icon={<Mail size={20}/>}>
+                  <input required maxLength={254} className="form-input" autoComplete="email" inputMode="email" placeholder="Enter your email address" value={form.username} onChange={e => change('username', e.target.value)}/>
                 </Field>
                 <Field label="Password" icon={<LockKeyhole size={19}/>}>
                   <PasswordInput key="login-password" autoComplete="current-password" placeholder="Enter your password" value={form.password} onChange={value => change('password', value)}/>
@@ -320,9 +370,6 @@ function AuthScreen({ onAuth }) {
                     onPhoneBlur={() => setPhoneTouched(true)} onPhoneChange={onPhoneChange} onCountryChange={onCountryChange}/>
                   {phoneTouched && phoneDigits.length !== 10 && <p role="alert" className="auth-field-hint text-red-600">Enter a valid 10-digit mobile number.</p>}
                 </div>
-                <Field label="Email Address" icon={<Mail size={19}/>}>
-                  <input required type="email" maxLength={254} className="form-input" autoComplete="email" placeholder="Enter your email address" value={form.email} onChange={e => change('email', e.target.value)}/>
-                </Field>
                 <Field label="Class" icon={<GraduationCap size={20}/>}>
                   <select required className="form-input" value={form.grade} onChange={e => change('grade', e.target.value)}><option value="" disabled>Select your class</option>{grades.map(g => <option value={g} key={g}>Class {g}</option>)}</select>
                 </Field>
@@ -331,8 +378,8 @@ function AuthScreen({ onAuth }) {
                 </Field>
               </>}
               {isRegister && signupStep === 2 && <>
-                <Field label="Username" icon={<UserRound size={19}/>} hint="Use only letters, numbers and underscores.">
-                  <input required minLength={3} maxLength={32} pattern="[A-Za-z0-9_]+" title="Letters, numbers and underscores only" className="form-input" autoComplete="username" placeholder="Choose a username" value={form.username} onChange={e => change('username', e.target.value)}/>
+                <Field label="Email Address" icon={<Mail size={19}/>}>
+                  <input required type="email" maxLength={254} className="form-input" autoComplete="email" placeholder="Enter your email address" value={form.email} onChange={e => change('email', e.target.value)}/>
                 </Field>
                 <Field label="Password" icon={<LockKeyhole size={19}/>} hint="At least 8 characters.">
                   <PasswordInput key="new-password" minLength={8} autoComplete="new-password" placeholder="Create a password" value={form.password} onChange={value => change('password', value)}/>
@@ -365,6 +412,7 @@ function AuthScreen({ onAuth }) {
             {isRegister && signupStep === 2 && <button className="auth-back-link" type="button" onClick={previousStep}>Back to student details</button>}
           </div>
           {isRegister && <p className="auth-register-switch">Already have an account? <button type="button" onClick={() => switchScreen('login')}>Sign in</button></p>}
+          {exitWarning && <div className="study-exit-overlay" role="dialog" aria-modal="true" aria-label="Exit StudyMate?"><div className="study-exit-panel"><h2>Leave StudyMate?</h2><p>Your learning session will remain saved.</p><div><button type="button" onClick={()=>setExitWarning(false)}>Stay here</button><button type="button" onClick={confirmExit}>Leave</button></div></div></div>}
         </div>
       </section>
     </div>
@@ -406,7 +454,7 @@ function Answer({ content }) {
   }
   return <div className="min-w-0 flex-1">
     <div className="ai-markdown break-words text-[14.5px] leading-[1.85] text-[#334155]">
-      <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{content}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(content)}</ReactMarkdown>
     </div>
     <button type="button" onClick={copy} title="Copy answer" className="mt-3 inline-flex items-center gap-1.5 rounded-md p-1.5 text-xs font-semibold text-[#94a3b8] transition hover:bg-[#eff6ff] hover:text-[#2563eb]">{copied ? <Check size={15}/> : <Clipboard size={15}/>} {copied ? 'Copied' : 'Copy answer'}</button>
   </div>;
@@ -422,8 +470,6 @@ function Sidebar({ user, conversations, activeId, onNew, onOpen, onDelete, onSet
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[278px] max-w-[88vw] shrink-0 flex-col border-r border-[#e2e8f0] bg-white transition-transform md:static md:translate-x-0 ${visible ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex items-center justify-between px-6 py-7"><Brand/><button className="md:hidden" onClick={close} aria-label="Close menu"><X size={20}/></button></div>
       <div className="px-4"><button onClick={onNew} className="primary-button w-full justify-center py-3"><Plus size={18}/> New question</button></div>
-      <div className="mt-9 px-6"><p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-[#94a3b8]">Study workspace</p></div>
-      <div className="mt-3 space-y-1 px-3"><div className="flex items-center gap-3 rounded-lg bg-[#eff6ff] px-4 py-3 text-[13px] font-bold text-[#1d4ed8]"><MessageCircle size={17}/> Ask StudyMate</div></div>
       <div className="mt-9 flex items-center justify-between px-6"><span className="text-[11px] font-extrabold uppercase tracking-[.14em] text-[#94a3b8]">Recent questions</span><History size={15} className="text-[#94a3b8]"/></div>
       <nav aria-label="Chat history" className="mt-3 flex-1 space-y-0.5 overflow-y-auto px-3 pb-6">
         {!conversations.length && <p className="px-3 py-3 text-[13px] leading-6 text-[#94a3b8]">Your questions will appear here once you start studying.</p>}
@@ -433,9 +479,8 @@ function Sidebar({ user, conversations, activeId, onNew, onOpen, onDelete, onSet
         </div>)}
       </nav>
       <div className="border-t border-[#e2e8f0] p-4">
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-[#64748b] hover:bg-[#f1f5f9]" onClick={onSettings}><Settings2 size={17}/> Your profile</button>
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-[#64748b] hover:bg-[#f1f5f9]" onClick={onLogout}><LogOut size={17}/> Sign out</button>
-        <div className="mt-4 flex items-center gap-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#dbeafe] text-sm font-bold text-[#1d4ed8]">{user.full_name[0]?.toUpperCase()}</span><div className="min-w-0"><p className="truncate text-[13px] font-bold text-[#0f172a]">{user.full_name}</p><p className="truncate text-[11px] text-[#64748b]">Class {user.grade} · {user.board}</p></div></div>
+        <button type="button" onClick={onSettings} className="flex w-full items-center gap-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 text-left hover:border-blue-300 hover:bg-[#eff6ff]" aria-label="Open your learning profile"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#dbeafe] text-sm font-bold text-[#1d4ed8]">{user.full_name[0]?.toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-bold text-[#0f172a]">{user.full_name}</span><span className="block truncate text-[11px] text-[#64748b]">Class {user.grade} · {user.board}</span></span><ChevronRight size={17} className="shrink-0 text-slate-400"/></button>
+        <button type="button" className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-semibold text-[#64748b] hover:bg-[#f1f5f9]" onClick={onLogout}><LogOut size={17}/> Sign out</button>
       </div>
     </aside>
   </>;
@@ -451,13 +496,18 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exitWarning, setExitWarning] = useState(false);
+  const [streamingAnswer, setStreamingAnswer] = useState('');
   const [listening, setListening] = useState(false);
   const [voiceSupported] = useState(() => typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
   const speechRef = useRef(null);
   const activeRef = useRef(null);
   const busyRef = useRef(false);
   const requestRef = useRef(0);
-  const scrollRef = useRef(null);
+  const studyScrollRef = useRef(null);
+  const navStateRef = useRef({ page: 'home', id: null, sidebar: false, profile: false });
+  const allowExitRef = useRef(false);
+  const chatHistoryInitialized = useRef(false);
   const inputRef = useRef(null);
   // Browser SpeechRecognition sends recognized words to the input only; the student chooses when to send.
   // This requires HTTPS (or localhost) and microphone permission. Browser support varies.
@@ -471,6 +521,62 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
       recognition.abort();
     }
   }, []);
+  useEffect(() => {
+    // The visual viewport shrinks when the Android keyboard opens.
+    // Only the study messages should scroll; the header stays at the top.
+    const viewport = window.visualViewport;
+    const updateHeight = () => document.documentElement.style.setProperty(
+      '--sm-viewport-height', `${Math.round(viewport?.height || window.innerHeight)}px`
+    );
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    updateHeight();
+    viewport?.addEventListener('resize', updateHeight);
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      document.body.style.overflow = oldOverflow;
+      document.documentElement.style.removeProperty('--sm-viewport-height');
+      viewport?.removeEventListener('resize', updateHeight);
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+  useEffect(() => {
+    if (!chatHistoryInitialized.current) {
+      saveNavigation('chat', 'home');
+      chatHistoryInitialized.current = true;
+    }
+    function onBack(event) {
+      if (allowExitRef.current) return;
+      const state = event.state;
+      if (state?.[SM_HISTORY_KEY] && state.area === 'chat') {
+        navStateRef.current = { page: state.page, id: state.id || null, sidebar: !!state.sidebar, profile: !!state.profile };
+        setSidebarOpen(!!state.sidebar);
+        setSettingsOpen(!!state.profile);
+        if (state.page === 'home') {
+          activeRef.current = null; setActiveId(null); setMessages([]);
+          setLoadingChat(false); setStreamingAnswer(''); setError('');
+        } else if (state.id && activeRef.current !== state.id) {
+          loadConversation(state.id);
+        }
+      } else {
+        const current = navStateRef.current;
+        saveNavigation('chat', current.page, { id: current.id, sidebar: current.sidebar, profile: current.profile });
+        setExitWarning(true);
+      }
+    }
+    window.addEventListener('popstate', onBack);
+    return () => window.removeEventListener('popstate', onBack);
+  }, []);
+  function goTo(page, id = null, extra = {}) {
+    const next = { page, id, sidebar: false, profile: false, ...extra };
+    navStateRef.current = next;
+    saveNavigation('chat', page, { id, sidebar: next.sidebar, profile: next.profile });
+    setSidebarOpen(next.sidebar); setSettingsOpen(next.profile);
+  }
+  function showSidebar() { const current = navStateRef.current; goTo(current.page, current.id, { sidebar: true }); }
+  function showProfile() { const current = navStateRef.current; goTo(current.page, current.id, { profile: true }); }
+  function dismissOverlay() { window.history.back(); }
+  function confirmExit() { allowExitRef.current = true; window.history.go(-2); }
   function stopVoice() {
     const recognition = speechRef.current;
     speechRef.current = null;
@@ -539,24 +645,34 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
     }
   }
   useEffect(() => { request('/conversations', {token}).then(setConversations).catch(err => setError(err.message)); }, [token]);
-  useEffect(() => {scrollRef.current?.scrollIntoView({behavior:'smooth'});}, [messages,sending]);
+  useEffect(() => { const box = studyScrollRef.current; if (box) box.scrollTop = box.scrollHeight; }, [messages, sending, streamingAnswer]);
   async function refresh() { setConversations(await request('/conversations', {token})); }
-  function newChat() { if (busyRef.current) return; stopVoice(); requestRef.current += 1; activeRef.current = null; setActiveId(null); setMessages([]); setQuestion(''); setError(''); setSidebarOpen(false); inputRef.current?.focus(); }
-  async function openChat(id) { if (busyRef.current) return; stopVoice(); const ticket=++requestRef.current; activeRef.current=id; setActiveId(id); setSidebarOpen(false); setMessages([]); setError(''); setLoadingChat(true); try {const chat=await request(`/conversations/${id}`,{token}); if(ticket===requestRef.current)setMessages(chat.messages);} catch(err){if(ticket===requestRef.current)setError(err.message);} finally{if(ticket===requestRef.current)setLoadingChat(false);} }
+  function newChat() { if (busyRef.current) return; stopVoice(); requestRef.current += 1; activeRef.current = null; setActiveId(null); setMessages([]); setQuestion(''); setError(''); setStreamingAnswer(''); goTo('home'); }
+  async function loadConversation(id) { stopVoice(); const ticket=++requestRef.current; activeRef.current=id;setActiveId(id);setMessages([]);setStreamingAnswer('');setError('');setLoadingChat(true);try{const chat=await request(`/conversations/${id}`,{token});if(ticket===requestRef.current)setMessages(chat.messages);}catch(err){if(ticket===requestRef.current)setError(err.message);}finally{if(ticket===requestRef.current)setLoadingChat(false);} }
+  async function openChat(id) { if(busyRef.current)return;goTo('conversation',id);await loadConversation(id); }
   async function deleteChat(id) { if(busyRef.current || !window.confirm('Delete this conversation?'))return; try{await request(`/conversations/${id}`,{token,method:'DELETE'});if(activeRef.current===id)newChat();await refresh();}catch(err){setError(err.message);} }
   async function send(text=question) {
     const clean=text.trim(); if(!clean || busyRef.current || loadingChat)return;
     if (speechRef.current) stopVoice();
-    busyRef.current=true;setSending(true);setError('');setQuestion('');
-    const optimistic={id:`temp_${Date.now()}`,role:'user',content:clean};setMessages(old=>[...old,optimistic]);
-    try{
+    busyRef.current=true;setSending(true);setError('');setQuestion('');setStreamingAnswer('');
+    if (window.innerWidth < 768) inputRef.current?.blur();
+    const optimistic={id:`temp_${Date.now()}`,role:'user',content:clean};
+    setMessages(old=>[...old,optimistic]);
+    try {
       let id=activeRef.current;
-      if(id===null){const chat=await request('/conversations',{method:'POST',token});id=chat.id;activeRef.current=id;setActiveId(id);}
-      const result=await request(`/conversations/${id}/messages`,{method:'POST',token,body:{question:clean}});
-      setMessages(old=>[...old.filter(m=>m.id!==optimistic.id),result.user_message,result.assistant_message]);
+      if(id===null){
+        const chat=await request('/conversations',{method:'POST',token});
+        id=chat.id;activeRef.current=id;setActiveId(id);
+        goTo('conversation',id);
+      }
+      const result=await streamQuestion(id,clean,token,partial=>setStreamingAnswer(partial));
+      if (navStateRef.current.page === 'conversation' && navStateRef.current.id === id) {
+        setMessages(old=>[...old.filter(m=>m.id!==optimistic.id),result.user_message,result.assistant_message]);
+      }
+      setStreamingAnswer('');
       refresh().catch(()=>{});
-    }catch(err){setMessages(old=>old.filter(m=>m.id!==optimistic.id));setQuestion(clean);setError(err.message);}
-    finally{busyRef.current=false;setSending(false);inputRef.current?.focus();}
+    }catch(err){setMessages(old=>old.filter(m=>m.id!==optimistic.id));setStreamingAnswer('');setQuestion(clean);setError(err.message);}
+    finally{busyRef.current=false;setSending(false);}
   }
   const subjects = [
     { name: 'Maths', Icon: Calculator, color: 'green', question: 'How do I solve fractions?' },
@@ -565,19 +681,17 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
     { name: 'Social Studies', Icon: Globe2, color: 'orange', question: 'Why do we study history?' },
   ];
   const firstName = user.full_name?.trim().split(/\s+/)[0] || 'there';
-  const initials = (user.full_name || 'S').trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join('');
   const emptyChat = messages.length === 0 && !sending;
   return <div className="studymate-app flex h-[100dvh] min-h-0 overflow-hidden bg-[#f8fafc]">
-    <Sidebar user={user} conversations={conversations} activeId={activeId} visible={sidebarOpen} close={()=>setSidebarOpen(false)} onNew={newChat} onOpen={openChat} onDelete={deleteChat} onSettings={()=>{setSidebarOpen(false);setSettingsOpen(true);}} onLogout={onLogout}/>
+    <Sidebar user={user} conversations={conversations} activeId={activeId} visible={sidebarOpen} close={dismissOverlay} onNew={newChat} onOpen={openChat} onDelete={deleteChat} onSettings={showProfile} onLogout={onLogout}/>
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="study-header">
-        <button className="study-header-menu md:hidden" type="button" onClick={()=>setSidebarOpen(true)} aria-label="Open menu"><Menu size={23}/></button>
+        <button className="study-header-menu md:hidden" type="button" onClick={showSidebar} aria-label="Open menu"><Menu size={23}/></button>
         <div className="study-header-brand"><Brand/></div>
-        <button type="button" onClick={()=>setSettingsOpen(true)} className="study-avatar md:hidden" aria-label="Open your profile">{initials}</button>
-        <button onClick={()=>setSettingsOpen(true)} className="study-desktop-profile hidden md:flex"><GraduationCap size={16}/> Class {user.grade} · {user.board}</button>
+        <span className="study-header-spacer md:hidden" aria-hidden="true"/>
       </header>
       <main className="study-main relative flex min-h-0 flex-1 flex-col">
-        <div className="study-scroll flex-1 overflow-y-auto" aria-live="polite">
+        <div ref={studyScrollRef} className="study-scroll flex-1 overflow-y-auto" aria-live="polite">
           <div className={`study-content mx-auto flex min-h-full w-full max-w-[900px] flex-col ${emptyChat ? 'study-content-empty' : ''}`}>
             {loadingChat ? <div className="flex flex-1 items-center justify-center text-[#2563eb]"><Loader2 className="animate-spin" size={27}/></div> : emptyChat ?
             <div className="study-welcome">
@@ -586,10 +700,10 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
                 <p>What would you like to learn today?</p>
               </div>
               <div className="study-subjects" aria-label="Quick subjects">
-                {subjects.map(({name, Icon, color, question: example}) => <button type="button" disabled={sending} key={name} className="study-subject-tile" onClick={()=>send(example)}>
+                {subjects.map(({name, Icon, color}) => <div key={name} className="study-subject-tile">
                   <span className={`study-subject-icon subject-${color}`}><Icon size={23}/></span>
                   <span>{name}</span>
-                </button>)}
+                </div>)}
               </div>
               <div className="study-empty-card">
                 <div className="study-empty-content">
@@ -601,7 +715,7 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
                   {['What is gravity?', 'Explain photosynthesis', 'How to solve quadratic equations?'].map(item => <button type="button" key={item} onClick={()=>send(item)}>{item}</button>)}
                 </div>
               </div>
-            </div> : <div className="study-messages flex flex-col gap-8">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="flex items-center gap-3.5"><span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span><span className="inline-flex items-center gap-2 text-sm text-[#64748b]"><Loader2 size={15} className="animate-spin"/> Preparing an explanation for Class {user.grade}...</span></div>}<div ref={scrollRef}/></div>}
+            </div> : <div className="study-messages flex flex-col gap-8">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="flex gap-3.5"><span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span>{streamingAnswer ? <div className="min-w-0 flex-1"><div className="ai-markdown break-words text-[14.5px] leading-[1.85]"><ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(streamingAnswer)}</ReactMarkdown></div><span className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#64748b]"><Loader2 size={13} className="animate-spin"/> Writing answer…</span></div> : <span className="inline-flex items-center gap-2 text-sm text-[#64748b]"><Loader2 size={15} className="animate-spin"/> Preparing an explanation for Class {user.grade}...</span>}</div>}</div>}
           </div>
         </div>
         <div className="study-composer-wrap">
@@ -619,7 +733,8 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
         </div>
       </main>
     </div>
-    {settingsOpen && <ProfileModal user={user} token={token} onClose={()=>setSettingsOpen(false)} onUpdate={onUpdateUser}/>}
+    {exitWarning && <div className="study-exit-overlay" role="dialog" aria-modal="true" aria-label="Leave StudyMate?"><div className="study-exit-panel"><h2>Leave StudyMate?</h2><p>Your chats are saved. Would you like to leave the site?</p><div><button type="button" onClick={()=>setExitWarning(false)}>Stay here</button><button type="button" onClick={confirmExit}>Leave</button></div></div></div>}
+    {settingsOpen && <ProfileModal user={user} token={token} onClose={dismissOverlay} onUpdate={onUpdateUser}/>}
   </div>;
 }
 export default function App() {

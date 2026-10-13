@@ -255,3 +255,44 @@ button:disabled {cursor:not-allowed;opacity:.6;}
  .study-empty-icon {width:65px;height:65px;}
  .study-empty-content {min-height:135px;padding:10px 6px 20px;}
 }
+
+/* Mobile app shell: lock the header in place while Android's keyboard changes the viewport. */
+.studymate-app {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--sm-viewport-height, 100dvh) !important;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.study-header {
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+  justify-content: space-between;
+}
+.study-header-spacer { width: 39px; flex-shrink: 0; }
+.study-scroll {
+  min-height: 0;
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+}
+.study-composer-wrap {position:relative;z-index:5;flex-shrink:0;}
+.study-subject-tile {cursor:default;user-select:none;}
+.study-subject-tile:hover {border-color:#e7ebf2;box-shadow:0 4px 14px rgba(23,59,92,.035);}
+/* Responsive math: math blocks scroll horizontally rather than spilling out of phone width. */
+.ai-markdown {min-width:0;overflow-wrap:anywhere;}
+.ai-markdown .katex-display {max-width:100%;overflow-x:auto;overflow-y:hidden;overflow-wrap:normal;}
+.ai-markdown .katex-display > .katex {white-space:nowrap;}
+.study-exit-overlay {position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.46);padding:20px;}
+.study-exit-panel {width:min(100%,360px);padding:24px;background:#fff;border-radius:17px;box-shadow:0 18px 65px rgba(15,23,42,.18);}
+.study-exit-panel h2 {font-family:'Plus Jakarta Sans',sans-serif;font-size:19px;font-weight:800;color:#0f172a;}
+.study-exit-panel p {margin:10px 0 20px;font-size:13px;line-height:1.65;color:#64748b;}
+.study-exit-panel > div {display:flex;justify-content:flex-end;gap:10px;}
+.study-exit-panel button {border:1px solid #dae5f4;border-radius:9px;padding:10px 17px;font-size:13px;font-weight:700;color:#1d4ed8;}
+.study-exit-panel button:last-child {background:#2563eb;color:white;border-color:#2563eb;}
+@media(max-width:767px) {
+  .study-header {min-height:68px;height:68px;}
+  .study-content {padding:20px 17px 24px;}
+  .study-composer-wrap {padding-bottom:max(8px,env(safe-area-inset-bottom));}
+}

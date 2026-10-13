@@ -20,7 +20,8 @@ class CheckOtpResponse(BaseModel):
     message: str
 
 class RegisterRequest(BaseModel):
-    username: Username
+    # Backward compatible: legacy clients may still supply a username.
+    username: Username | None = None
     full_name: str = Field(min_length=2, max_length=80)
     email: EmailStr
     whatsapp_number: Phone

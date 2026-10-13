@@ -1,5 +1,6 @@
 """Class-aware tutoring prompts and Groq's HTTP chat API."""
 import os
+import json
 
 import httpx
 from fastapi import HTTPException
@@ -28,10 +29,13 @@ Teaching requirements:
    - For longer answers, add helpful ## headings and short bullet/numbered lists.
    - Bold key vocabulary once, use simple worked examples, and end with a brief recap
      when it improves understanding. Do not over-format short answers.
-   - For mathematics use LaTeX: $...$ for inline equations and $$...$$ for display.
-     Put $$ on separate lines. Show calculations step by step when appropriate.
+   - For mathematics use ONLY LaTeX $...$ for inline equations and $$...$$ for display.
+     NEVER use \\[...\\] or \\(...\\). Put $$ on its own lines.
+     Show calculations step by step when appropriate.
    - Format code using fenced code blocks with a language label.
    - Use GFM tables only when a comparison really benefits from a table.
+   - Keep routine answers concise. For broad questions, begin with a clear short explanation;
+     use deeper steps only when the student asks for them.
    - Avoid giant unbroken paragraphs and avoid heavy or decorative emoji.
 5. Avoid mentioning textbook pages or claiming to cite materials you have not read.
 6. Keep facts accurate. If you are unsure, say so rather than guessing.
@@ -60,10 +64,10 @@ async def generate_answer(student: User, history: list[dict[str, str]], question
             {"role": "user", "content": question},
         ],
         "temperature": 0.45,
-        "max_completion_tokens": 1400,
+        "max_completion_tokens": 1050 if student.grade <= 8 else 1350,
     }
     if model.startswith("openai/gpt-oss-"):
-        payload["reasoning_effort"] = "low" if student.grade <= 8 else "medium"
+        payload["reasoning_effort"] = "low"
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -89,3 +93,54 @@ async def generate_answer(student: User, history: list[dict[str, str]], question
         raise HTTPException(status_code=502, detail="Groq could not answer right now. Please retry.") from None
     except (ValueError, KeyError, IndexError, TypeError):
         raise HTTPException(status_code=502, detail="Groq returned an unexpected response.") from None
+
+
+async def stream_answer(student: User, history: list[dict[str, str]], question: str):
+    """Yield Groq answer tokens as available. Makes first text visible earlier than a full response.
+
+    The streamed answer is assembled and saved by the API endpoint after [DONE].
+    """
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Groq API key is not configured.")
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": build_system_prompt(student)},
+            *history[-12:],
+            {"role": "user", "content": question},
+        ],
+        "temperature": 0.4,
+        "max_completion_tokens": 1050 if student.grade <= 8 else 1350,
+        "stream": True,
+    }
+    if model.startswith("openai/gpt-oss-"):
+        payload["reasoning_effort"] = "low"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(55.0, connect=10.0)) as client:
+            async with client.stream("POST", GROQ_CHAT_URL, json=payload,
+                                     headers={"Authorization": f"Bearer {api_key}"}) as response:
+                if response.status_code != 200:
+                    if response.status_code == 429:
+                        raise HTTPException(status_code=429, detail="AI usage limit reached. Please try later.")
+                    if response.status_code in (401, 403):
+                        raise HTTPException(status_code=503, detail="Groq credentials are not accepted.")
+                    raise HTTPException(status_code=502, detail="Groq could not answer right now.")
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    content = line[6:].strip()
+                    if content == "[DONE]":
+                        break
+                    try:
+                        payload_event = json.loads(content)
+                        piece = payload_event["choices"][0].get("delta", {}).get("content")
+                    except (ValueError, KeyError, IndexError, TypeError):
+                        continue
+                    if piece:
+                        yield piece
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="AI response timed out. Please retry.") from None
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Could not connect to Groq. Please retry.") from None
