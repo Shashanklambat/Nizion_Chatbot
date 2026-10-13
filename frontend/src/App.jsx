@@ -486,6 +486,66 @@ function Sidebar({ user, conversations, activeId, onNew, onOpen, onDelete, onSet
   </>;
 }
 
+// Native window.confirm() is unreliable in embedded/mobile browsers. Use an explicit
+// in-app dialog for every destructive account/chat action instead.
+function ActionConfirmation({ action, busy, error, onCancel, onConfirm }) {
+  const cancelRef = useRef(null);
+  const dialogRef = useRef(null);
+  const isDelete = action.type === 'delete';
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (!busy) onCancel();
+      }
+      if (event.key === 'Tab' && dialogRef.current) {
+        const buttons = Array.from(dialogRef.current.querySelectorAll('button:not(:disabled)'));
+        if (!buttons.length) { event.preventDefault(); return; }
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [busy, onCancel]);
+
+  return <div className="study-confirm-overlay" onMouseDown={e => {
+    if (e.target === e.currentTarget && !busy) onCancel();
+  }}>
+    <div className="study-confirm-panel" role="alertdialog" aria-modal="true"
+      aria-labelledby="study-confirm-title" aria-describedby="study-confirm-description" ref={dialogRef}>
+      <div className={`study-confirm-icon ${isDelete ? 'is-danger' : ''}`} aria-hidden="true">
+        {isDelete ? <Trash2 size={22}/> : <LogOut size={22}/>}
+      </div>
+      <h2 id="study-confirm-title" className="font-display">
+        {isDelete ? 'Delete this chat?' : 'Sign out of StudyMate?'}
+      </h2>
+      <p id="study-confirm-description">
+        {isDelete ? <>Are you sure you want to delete <strong className="study-confirm-chat-title">{action.title}</strong>? This chat and its messages cannot be recovered.</>
+          : 'You will return to the sign-in screen. Your saved chats will be here when you sign in again.'}
+      </p>
+      {error && <p className="study-confirm-error" role="alert">{error}</p>}
+      <div className="study-confirm-actions">
+        <button type="button" className="study-confirm-cancel" ref={cancelRef}
+          disabled={busy} onClick={onCancel}>Cancel</button>
+        <button type="button" className={`study-confirm-accept ${isDelete ? 'is-danger' : ''}`}
+          disabled={busy} onClick={onConfirm}>
+          {busy ? <><Loader2 size={16} className="animate-spin"/> Please wait…</> : isDelete ? 'Delete chat' : 'Sign out'}
+        </button>
+      </div>
+    </div>
+  </div>;
+}
+
 function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -497,6 +557,11 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exitWarning, setExitWarning] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
+  const [confirmationError, setConfirmationError] = useState('');
+  const pendingActionRef = useRef(null);
+  const confirmationBusyRef = useRef(false);
   const [streamingAnswer, setStreamingAnswer] = useState('');
   const [listening, setListening] = useState(false);
   const [voiceSupported] = useState(() => typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
@@ -547,6 +612,15 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
     }
     function onBack(event) {
       if (allowExitRef.current) return;
+      // Android hardware Back dismisses a destructive confirmation; it never confirms it.
+      if (pendingActionRef.current) {
+        cancelPendingAction();
+        const current = navStateRef.current;
+        saveNavigation('chat', current.page, {
+          id: current.id, sidebar: current.sidebar, profile: current.profile,
+        });
+        return;
+      }
       const state = event.state;
       if (state?.[SM_HISTORY_KEY] && state.area === 'chat') {
         navStateRef.current = { page: state.page, id: state.id || null, sidebar: !!state.sidebar, profile: !!state.profile };
@@ -650,7 +724,58 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   function newChat() { if (busyRef.current) return; stopVoice(); requestRef.current += 1; activeRef.current = null; setActiveId(null); setMessages([]); setQuestion(''); setError(''); setStreamingAnswer(''); goTo('home'); }
   async function loadConversation(id) { stopVoice(); const ticket=++requestRef.current; activeRef.current=id;setActiveId(id);setMessages([]);setStreamingAnswer('');setError('');setLoadingChat(true);try{const chat=await request(`/conversations/${id}`,{token});if(ticket===requestRef.current)setMessages(chat.messages);}catch(err){if(ticket===requestRef.current)setError(err.message);}finally{if(ticket===requestRef.current)setLoadingChat(false);} }
   async function openChat(id) { if(busyRef.current)return;goTo('conversation',id);await loadConversation(id); }
-  async function deleteChat(id) { if(busyRef.current || !window.confirm('Delete this conversation?'))return; try{await request(`/conversations/${id}`,{token,method:'DELETE'});if(activeRef.current===id)newChat();await refresh();}catch(err){setError(err.message);} }
+  function requestDeleteChat(id) {
+    if (busyRef.current || confirmationBusyRef.current) return;
+    const chat = conversations.find(item => item.id === id);
+    if (!chat) return;
+    const action = { type: 'delete', id: chat.id, title: chat.title };
+    pendingActionRef.current = action;
+    setPendingAction(action);
+    setConfirmationError('');
+  }
+  function requestLogout() {
+    if (confirmationBusyRef.current) return;
+    const action = { type: 'logout' };
+    pendingActionRef.current = action;
+    setPendingAction(action);
+    setConfirmationError('');
+  }
+  function cancelPendingAction() {
+    if (confirmationBusyRef.current) return;
+    pendingActionRef.current = null;
+    setPendingAction(null);
+    setConfirmationError('');
+  }
+  async function confirmPendingAction() {
+    const action = pendingActionRef.current;
+    if (!action || confirmationBusyRef.current) return;
+    confirmationBusyRef.current = true;
+    setConfirmationBusy(true);
+    setConfirmationError('');
+    try {
+      if (action.type === 'logout') {
+        // Logout happens ONLY after the student confirms in this modal.
+        stopVoice();
+        onLogout();
+        return;
+      }
+      if (action.type !== 'delete') return;
+      // Never call DELETE when merely opening, dismissing, or navigating the dialog.
+      await request(`/conversations/${action.id}`, { token, method: 'DELETE' });
+      pendingActionRef.current = null;
+      setPendingAction(null);
+      setConversations(old => old.filter(item => item.id !== action.id));
+      if (activeRef.current === action.id) newChat();
+      // The server is authoritative; refresh in the background without undoing success.
+      refresh().catch(err => setError(err.message));
+    } catch (err) {
+      // Leave the dialog open with an error so the user can retry or cancel.
+      setConfirmationError(err.message || 'Unable to complete the action. Please try again.');
+    } finally {
+      confirmationBusyRef.current = false;
+      setConfirmationBusy(false);
+    }
+  }
   async function send(text=question) {
     const clean=text.trim(); if(!clean || busyRef.current || loadingChat)return;
     if (speechRef.current) stopVoice();
@@ -683,7 +808,7 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   const firstName = user.full_name?.trim().split(/\s+/)[0] || 'there';
   const emptyChat = messages.length === 0 && !sending;
   return <div className="studymate-app flex h-[100dvh] min-h-0 overflow-hidden bg-[#f8fafc]">
-    <Sidebar user={user} conversations={conversations} activeId={activeId} visible={sidebarOpen} close={dismissOverlay} onNew={newChat} onOpen={openChat} onDelete={deleteChat} onSettings={showProfile} onLogout={onLogout}/>
+    <Sidebar user={user} conversations={conversations} activeId={activeId} visible={sidebarOpen} close={dismissOverlay} onNew={newChat} onOpen={openChat} onDelete={requestDeleteChat} onSettings={showProfile} onLogout={requestLogout}/>
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="study-header">
         <button className="study-header-menu md:hidden" type="button" onClick={showSidebar} aria-label="Open menu"><Menu size={23}/></button>
@@ -733,6 +858,8 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
         </div>
       </main>
     </div>
+    {pendingAction && <ActionConfirmation action={pendingAction} busy={confirmationBusy}
+      error={confirmationError} onCancel={cancelPendingAction} onConfirm={confirmPendingAction}/>}
     {exitWarning && <div className="study-exit-overlay" role="dialog" aria-modal="true" aria-label="Leave StudyMate?"><div className="study-exit-panel"><h2>Leave StudyMate?</h2><p>Your chats are saved. Would you like to leave the site?</p><div><button type="button" onClick={()=>setExitWarning(false)}>Stay here</button><button type="button" onClick={confirmExit}>Leave</button></div></div></div>}
     {settingsOpen && <ProfileModal user={user} token={token} onClose={dismissOverlay} onUpdate={onUpdateUser}/>}
   </div>;

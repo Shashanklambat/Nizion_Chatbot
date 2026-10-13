@@ -296,3 +296,40 @@ button:disabled {cursor:not-allowed;opacity:.6;}
   .study-content {padding:20px 17px 24px;}
   .study-composer-wrap {padding-bottom:max(8px,env(safe-area-inset-bottom));}
 }
+
+
+/* Destructive actions use an in-app confirmation, not the browser's suppressible confirm(). */
+.study-confirm-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+           max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background: rgba(15, 23, 42, .58);
+}
+.study-confirm-panel {
+  width: min(100%, 390px); max-height: min(90dvh, 540px); overflow-y: auto;
+  padding: 24px; border: 1px solid #e2e8f0; border-radius: 18px;
+  background: #fff; box-shadow: 0 24px 75px rgba(15, 23, 42, .22);
+}
+.study-confirm-icon {
+  width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;
+  border-radius: 13px; background: #eff6ff; color: #2563eb; margin-bottom: 15px;
+}
+.study-confirm-icon.is-danger { background: #fef2f2; color: #dc2626; }
+.study-confirm-panel h2 {font-size: 19px; font-weight: 800; line-height: 1.35; color: #0f172a;}
+.study-confirm-panel > p {margin-top: 9px; font-size: 13px; line-height: 1.7; color: #64748b; overflow-wrap: anywhere;}
+.study-confirm-chat-title {font-weight: 700; color: #334155;}
+.study-confirm-panel .study-confirm-error {margin-top: 12px; padding: 10px; background: #fff1f2; color: #b91c1c; border-radius: 8px;}
+.study-confirm-actions {display: flex; gap: 10px; margin-top: 24px;}
+.study-confirm-actions button {
+  display: inline-flex; flex: 1; gap: 7px; align-items: center; justify-content: center;
+  min-height: 44px; padding: 10px 12px; border-radius: 10px;
+  font-size: 13px; font-weight: 700; transition: background-color .15s;
+}
+.study-confirm-cancel {color: #334155; background: #fff; border: 1px solid #cbd5e1;}
+.study-confirm-cancel:hover {background: #f1f5f9;}
+.study-confirm-accept {background: #2563eb; color: #fff;}
+.study-confirm-accept:hover {background: #1d4ed8;}
+.study-confirm-accept.is-danger {background: #dc2626;}
+.study-confirm-accept.is-danger:hover {background: #b91c1c;}
+.study-confirm-actions button:disabled {opacity: .65; cursor: not-allowed;}
