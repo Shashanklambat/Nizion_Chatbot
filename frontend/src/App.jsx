@@ -8,7 +8,7 @@ import {
   ArrowRight, ArrowUp, BookMarked, BookOpen, Check, CheckCircle2, ChevronRight,
   CircleHelp, Clipboard, GraduationCap, History, Loader2, LockKeyhole, LogOut,
   Menu, MessageCircle, Plus, Settings2, ShieldCheck, Sparkles, Trash2, X,
-  ChevronDown, Eye, EyeOff, Search,
+  ChevronDown, Eye, EyeOff, Search, UserRound, Mail, Mic, MicOff, Calculator, FlaskConical, BookText, Globe2, MessageSquareMore, Lock, ArrowLeft,
 } from 'lucide-react';
 import { request } from './api';
 import { countryCodes } from './countryCodes';
@@ -122,12 +122,13 @@ function PhoneInput({ country, phone, onCountryChange, onPhoneChange, onPhoneBlu
   </div>;
 }
 
-function Field({ label, children, hint }) {
+function Field({ label, children, hint, icon }) {
   const id = useId();
-  return <div className="block">
-    <label htmlFor={id} className="mb-2 block text-[13px] font-semibold text-[#334155]">{label}</label>
-    {cloneElement(children, { id })}
-    {hint && <p className="mt-1.5 text-xs text-[#64748b]">{hint}</p>}
+  const control = cloneElement(children, { id });
+  return <div className="auth-field">
+    <label htmlFor={id} className="auth-field-label">{label}</label>
+    {icon ? <div className="auth-icon-field"><span className="auth-field-icon" aria-hidden="true">{icon}</span>{control}</div> : control}
+    {hint && <p className="auth-field-hint">{hint}</p>}
   </div>;
 }
 function InlineError({ error }) {
@@ -142,6 +143,7 @@ function AuthScreen({ onAuth }) {
     password: '', grade: '', board: '', language: 'English', guardian_permission: false });
   const [selectedCountry, setSelectedCountry] = useState(countryCodes[0]);
   const [phoneDigits, setPhoneDigits] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
   const fullPhoneNumber = `${selectedCountry.dial}${phoneDigits}`;
   const [verification, setVerification] = useState({ step: 'idle', code: '', ticket: '' });
@@ -165,6 +167,7 @@ function AuthScreen({ onAuth }) {
     setTab(next);
     setSignupStep(1);
     setForm(previous => ({ ...previous, username: '', password: '' }));
+    setConfirmPassword('');
     setError('');
   }
   function change(field, value) {
@@ -225,6 +228,10 @@ function AuthScreen({ onAuth }) {
       window.scrollTo(0, 0);
       return;
     }
+    if (tab === 'register' && form.password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter them.');
+      return;
+    }
     if (tab === 'register' && otpEnabled === null) {
       setError('Cannot load registration settings. Check your connection and refresh.');
       return;
@@ -248,118 +255,121 @@ function AuthScreen({ onAuth }) {
   }
 
   const isRegister = tab === 'register';
+  function previousStep() {
+    if (signupStep === 2) { setSignupStep(1); setError(''); }
+    else switchScreen('login');
+  }
   return (
-    <div className="auth-shell min-h-[100dvh] bg-[#f8fafc] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(440px,1fr)]">
-      <section className="auth-editorial relative hidden min-h-screen flex-col justify-between overflow-hidden border-r border-[#dfe8f4] px-[clamp(35px,6vw,100px)] py-12 lg:flex">
-        <Brand />
-        <div className="relative z-10 max-w-[500px] py-14">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-[#cbdcf8] bg-white px-3 py-2 text-xs font-semibold text-[#1d4ed8]"><BookMarked size={15}/> THE EVERYDAY STUDY DESK</div>
-          <h1 className="font-display text-[clamp(43px,4.2vw,68px)] font-extrabold leading-[1.1] tracking-[-.065em] text-[#0f172a]">
-            Better questions.<br/><span className="text-[#2563eb]">Clearer answers.</span>
-          </h1>
-          <p className="mt-6 max-w-md text-[16px] leading-8 text-[#64748b]">
-            A thoughtful learning companion that explains concepts at the level you study — from your first science lesson to senior school.
-          </p>
-          <div className="learning-note mt-11 max-w-[440px] bg-white p-6">
-            <div className="mb-5 flex items-center justify-between border-b border-[#edf2f7] pb-4"><span className="font-display text-[13px] font-bold text-[#334155]">Inside a study session</span><span className="rounded-md bg-[#eff6ff] px-2.5 py-1 text-[11px] font-semibold text-[#2563eb]">SIMPLE EXPLANATION</span></div>
-            <p className="mb-3 text-[13px] font-semibold text-[#64748b]">Student asks</p>
-            <p className="rounded-lg bg-[#f1f5f9] px-4 py-3 text-sm font-semibold text-[#0f172a]">Why does a ball fall to the ground?</p>
-            <div className="mt-5 flex items-center gap-2 text-[13px] font-bold text-[#1d4ed8]"><BookOpen size={16}/> Explained for your class</div>
-            <p className="mt-2 text-[14px] leading-7 text-[#475569]">Earth pulls things toward itself. This pulling force is called <strong className="text-[#0f172a]">gravity</strong>. That's why a ball comes back down when you throw it up.</p>
-          </div>
+    <div className={`auth-shell ${isRegister ? 'auth-register' : 'auth-login'}`}>
+      <section className="auth-editorial auth-desktop-story" aria-hidden="true">
+        <Brand/>
+        <div className="auth-desktop-story-content">
+          <span className="auth-story-eyebrow">YOUR STUDY COMPANION</span>
+          <h1>Learning feels<br/><span>better together.</span></h1>
+          <p>Simple, thoughtful explanations made for the class you study in. Ask, discover, and grow at your own pace.</p>
+          <div className="auth-story-note"><BookOpen size={19}/> Answers shaped around your learning level</div>
         </div>
-        <p className="relative z-10 flex items-center gap-2 text-xs font-medium text-[#64748b]"><ShieldCheck size={16}/> Designed for focused, age-appropriate learning.</p>
+        <p className="auth-story-footer">StudyMate · A little help, every day.</p>
       </section>
-      <section className="auth-right flex min-h-[100dvh] min-w-0 flex-col px-7 pb-[max(22px,env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))] sm:items-center sm:justify-center sm:px-12 sm:py-10 lg:px-14">
-        <div className="mx-auto w-full max-w-[420px]">
-          <div className="mb-8 flex items-center justify-between lg:hidden">
-            <Brand/>
-            <span className="rounded-md bg-[#eff6ff] px-2.5 py-1.5 text-[10px] font-bold tracking-[.08em] text-[#1d4ed8]">STUDY SMARTER</span>
-          </div>
-          <div className="mb-6 sm:mb-7">
-            {isRegister ? <div className="mb-4 flex items-center gap-3" aria-label={`Registration step ${signupStep} of 2`}>
-              {[1, 2].map(step => <div key={step} className="flex flex-1 items-center gap-2">
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${step <= signupStep ? 'bg-[#2563eb] text-white' : 'bg-[#e2e8f0] text-[#64748b]'}`}>{step < signupStep ? <Check size={15}/> : step}</span>
-                <span className={`text-[11px] font-semibold ${step === signupStep ? 'text-[#1d4ed8]' : 'text-[#64748b]'}`}>{step === 1 ? 'Your details' : 'Account setup'}</span>
-              </div>)}
-            </div> : <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#2563eb]">Your learning space</p>}
-            <h2 className="font-display mt-2 text-[clamp(27px,7vw,34px)] font-extrabold leading-tight tracking-[-.055em] text-[#0f172a]">
-              {!isRegister ? 'Welcome back' : signupStep === 1 ? 'Let’s get to know you' : 'Set up your account'}
-            </h2>
-            <p className="mt-2 text-[13px] leading-6 text-[#64748b]">
-              {!isRegister ? 'Sign in to pick up where you left off.' : signupStep === 1
-                ? 'A few details to make learning feel personal.' : 'One last step, then your study desk is ready.'}
-            </p>
-          </div>
-
-          <form className="space-y-4" onSubmit={submit}>
-            {!isRegister && <>
-              <Field label="Username"><input required minLength={3} maxLength={32} className="form-input" autoComplete="username" placeholder="Your username" value={form.username} onChange={e => change('username', e.target.value)}/></Field>
-              <Field label="Password"><PasswordInput key="login-password" autoComplete="current-password" placeholder="Enter your password" value={form.password} onChange={value => change('password', value)}/></Field>
-            </>}
-
-            {isRegister && signupStep === 1 && <>
-              <Field label="Full name"><input required minLength={2} maxLength={80} className="form-input" autoComplete="name" placeholder="Enter your full name" value={form.full_name} onChange={e => change('full_name', e.target.value)}/></Field>
-              <div className="block">
-                <label htmlFor="signup-phone" className="mb-2 block text-[13px] font-semibold text-[#334155]">Mobile number</label>
-                <PhoneInput country={selectedCountry} phone={phoneDigits} invalid={phoneTouched && phoneDigits.length !== 10}
-                  onPhoneBlur={() => setPhoneTouched(true)}
-                  onPhoneChange={onPhoneChange} onCountryChange={onCountryChange}/>
-                {phoneTouched && phoneDigits.length !== 10
-                  ? <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">Enter a valid 10-digit mobile number.</p>
-                  : <p className="mt-1.5 text-xs text-[#64748b]">Select your country code, then enter exactly 10 digits.</p>}
-              </div>
-              <Field label="Email address"><input required type="email" maxLength={254} className="form-input" autoComplete="email" placeholder="you@example.com" value={form.email} onChange={e => change('email', e.target.value)}/></Field>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <Field label="Class"><select required className="form-input" value={form.grade} onChange={e => change('grade', e.target.value)}><option value="" disabled>Select class</option>{grades.map(g => <option value={g} key={g}>Class {g}</option>)}</select></Field>
-                <Field label="School board"><select required className="form-input" value={form.board} onChange={e => change('board', e.target.value)}><option value="" disabled>Select board</option>{boards.map(b => <option value={b} key={b}>{b}</option>)}</select></Field>
-              </div>
-              <p className="flex items-start gap-2 text-[11.5px] leading-5 text-[#64748b]"><LockKeyhole size={14} className="mt-0.5 shrink-0"/> Class and school board can't be changed after registration.</p>
-            </>}
-
-            {isRegister && signupStep === 2 && <>
-              <Field label="Username" hint="3–32 characters. Letters, numbers and underscores only.">
-                <input required minLength={3} maxLength={32} pattern="[A-Za-z0-9_]+" title="Letters, numbers and underscores only" className="form-input" autoComplete="username" placeholder="Choose a username" value={form.username} onChange={e => change('username', e.target.value)}/>
-              </Field>
-              <Field label="Password" hint="Use at least 8 characters.">
-                <PasswordInput key="new-password" minLength={8} autoComplete="new-password" placeholder="Create a strong password" value={form.password} onChange={value => change('password', value)}/>
-              </Field>
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#e2e8f0] bg-white px-3 py-3 text-[12px] leading-5 text-[#475569]">
-                <input required type="checkbox" checked={form.guardian_permission} onChange={e => change('guardian_permission', e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[#2563eb]"/>
-                <span>I am an adult or have permission from my parent or guardian to create this account.</span>
-              </label>
-              {otpEnabled === true && <div className="space-y-3 rounded-xl border border-[#d8e4f3] bg-[#f8fbff] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-[13px] font-bold text-[#0f172a]">Verify mobile number</h3>{verification.step === 'verified' && <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={15}/> Verified</span>}</div>
-                <p className="text-[12px] leading-5 text-[#64748b]">We’ll send a one-time code to your mobile number via WhatsApp.</p>
-                {verification.step === 'sent' && <div className="flex gap-2">
-                  <input aria-label="Six-digit verification code" className="form-input min-w-0 flex-1" maxLength={6} inputMode="numeric" pattern="[0-9]{6}" placeholder="6-digit code" value={verification.code} onChange={e => setVerification(old => ({ ...old, code: e.target.value.replace(/\D/g, '') }))}/>
-                  <button type="button" disabled={busy !== '' || verification.code.length !== 6} onClick={checkVerification} className="secondary-button shrink-0">{busy === 'verify' ? <Loader2 size={16} className="animate-spin"/> : 'Verify'}</button>
+      <section className="auth-main">
+        <div className="auth-main-inner">
+          {!isRegister ? (
+            <div className="auth-login-hero">
+              <img src="/studymate-logo.svg" alt="" className="auth-hero-logo"/>
+              <h1 className="font-display">Study<span>Mate</span></h1>
+              <p>Your Personal AI Study Companion</p>
+            </div>
+          ) : <>
+            <div className="auth-register-nav">
+              <button type="button" aria-label="Go back" onClick={previousStep} className="auth-nav-back"><ArrowLeft size={23}/></button>
+              <Brand/>
+              <span className="auth-nav-spacer"/>
+            </div>
+            <div className="auth-step-indicator" aria-label={`Step ${signupStep} of 2`}>
+              <span className={`auth-step-circle ${signupStep === 1 ? 'active' : 'done'}`}>1</span>
+              <span className={`auth-step-bar ${signupStep === 2 ? 'active' : ''}`}/>
+              <span className={`auth-step-circle ${signupStep === 2 ? 'active' : ''}`}>2</span>
+            </div>
+            <div className="auth-register-intro">
+              <h1 className="font-display">Create Your Account</h1>
+              <p className="auth-register-step">Step {signupStep} of 2 – {signupStep === 1 ? 'Student Details' : 'Account Setup'}</p>
+              <p className="auth-register-description">{signupStep === 1 ? "We'll use this information to give you the best learning experience." : 'Create a username and password to access your account.'}</p>
+            </div>
+          </>}
+          <div className="auth-card">
+            {!isRegister && <div className="auth-login-intro">
+              <h2 className="font-display">Welcome Back</h2>
+              <p>Sign in to continue your learning journey</p>
+            </div>}
+            <form className="auth-form" onSubmit={submit}>
+              {!isRegister && <>
+                <Field label="Username or email" icon={<UserRound size={20}/>}>
+                  <input required maxLength={254} className="form-input" autoComplete="username" placeholder="Enter your username or email" value={form.username} onChange={e => change('username', e.target.value)}/>
+                </Field>
+                <Field label="Password" icon={<LockKeyhole size={19}/>}>
+                  <PasswordInput key="login-password" autoComplete="current-password" placeholder="Enter your password" value={form.password} onChange={value => change('password', value)}/>
+                </Field>
+              </>}
+              {isRegister && signupStep === 1 && <>
+                <Field label="Full Name" icon={<UserRound size={19}/>}>
+                  <input required minLength={2} maxLength={80} className="form-input" autoComplete="name" placeholder="Enter your full name" value={form.full_name} onChange={e => change('full_name', e.target.value)}/>
+                </Field>
+                <div className="auth-field">
+                  <label htmlFor="signup-phone" className="auth-field-label">Mobile Number</label>
+                  <PhoneInput country={selectedCountry} phone={phoneDigits} invalid={phoneTouched && phoneDigits.length !== 10}
+                    onPhoneBlur={() => setPhoneTouched(true)} onPhoneChange={onPhoneChange} onCountryChange={onCountryChange}/>
+                  {phoneTouched && phoneDigits.length !== 10 && <p role="alert" className="auth-field-hint text-red-600">Enter a valid 10-digit mobile number.</p>}
+                </div>
+                <Field label="Email Address" icon={<Mail size={19}/>}>
+                  <input required type="email" maxLength={254} className="form-input" autoComplete="email" placeholder="Enter your email address" value={form.email} onChange={e => change('email', e.target.value)}/>
+                </Field>
+                <Field label="Class" icon={<GraduationCap size={20}/>}>
+                  <select required className="form-input" value={form.grade} onChange={e => change('grade', e.target.value)}><option value="" disabled>Select your class</option>{grades.map(g => <option value={g} key={g}>Class {g}</option>)}</select>
+                </Field>
+                <Field label="School Board" icon={<BookOpen size={20}/>}>
+                  <select required className="form-input" value={form.board} onChange={e => change('board', e.target.value)}><option value="" disabled>Select your school board</option>{boards.map(b => <option value={b} key={b}>{b}</option>)}</select>
+                </Field>
+              </>}
+              {isRegister && signupStep === 2 && <>
+                <Field label="Username" icon={<UserRound size={19}/>} hint="Use only letters, numbers and underscores.">
+                  <input required minLength={3} maxLength={32} pattern="[A-Za-z0-9_]+" title="Letters, numbers and underscores only" className="form-input" autoComplete="username" placeholder="Choose a username" value={form.username} onChange={e => change('username', e.target.value)}/>
+                </Field>
+                <Field label="Password" icon={<LockKeyhole size={19}/>} hint="At least 8 characters.">
+                  <PasswordInput key="new-password" minLength={8} autoComplete="new-password" placeholder="Create a password" value={form.password} onChange={value => change('password', value)}/>
+                </Field>
+                <Field label="Confirm Password" icon={<LockKeyhole size={19}/>}>
+                  <PasswordInput key="confirm-password" minLength={8} autoComplete="new-password" placeholder="Re-enter your password" value={confirmPassword} onChange={setConfirmPassword}/>
+                </Field>
+                <label className="auth-consent">
+                  <input required type="checkbox" checked={form.guardian_permission} onChange={e => change('guardian_permission', e.target.checked)}/>
+                  <span>I am an adult or have my parent or guardian's permission to create an account.</span>
+                </label>
+                {otpEnabled === true && <div className="space-y-3 rounded-xl border border-[#d8e4f3] bg-[#f8fbff] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-[13px] font-bold text-[#0f172a]">Verify mobile number</h3>{verification.step === 'verified' && <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={15}/> Verified</span>}</div>
+                  <p className="text-[12px] leading-5 text-[#64748b]">We'll send a one-time code to your mobile number via WhatsApp.</p>
+                  {verification.step === 'sent' && <div className="flex gap-2">
+                    <input aria-label="Six-digit verification code" className="form-input min-w-0 flex-1" maxLength={6} inputMode="numeric" pattern="[0-9]{6}" placeholder="6-digit code" value={verification.code} onChange={e => setVerification(old => ({...old,code:e.target.value.replace(/\D/g,'').slice(0,6)}))}/>
+                    <button type="button" disabled={busy !== '' || verification.code.length !== 6} onClick={checkVerification} className="secondary-button shrink-0">{busy === 'verify' ? <Loader2 size={16} className="animate-spin"/> : 'Verify'}</button>
+                  </div>}
+                  {verification.step !== 'verified' && <button type="button" disabled={busy !== '' || !form.guardian_permission} onClick={startVerification} className="secondary-button w-full justify-center">
+                    {busy === 'send' ? <Loader2 size={16} className="animate-spin"/> : verification.step === 'sent' ? 'Resend code' : 'Send verification code'}
+                  </button>}
                 </div>}
-                {verification.step !== 'verified' && <button type="button" disabled={busy !== '' || !form.guardian_permission} onClick={startVerification} className="secondary-button w-full justify-center">
-                  {busy === 'send' ? <Loader2 size={16} className="animate-spin"/> : verification.step === 'sent' ? 'Resend code' : 'Send verification code'}
-                </button>}
-              </div>}
-            </>}
-
-            <InlineError error={error}/>
-            {isRegister && signupStep === 2 ? <div className="flex gap-3 pt-1">
-              <button type="button" disabled={busy !== ''} onClick={() => { setSignupStep(1); setError(''); }} className="secondary-button min-h-[48px] justify-center px-5">Back</button>
-              <button type="submit" disabled={busy !== '' || otpEnabled === null} className="primary-button min-h-[48px] flex-1 justify-center">
-                {busy === 'account' ? <Loader2 size={18} className="animate-spin"/> : <>Create account <ArrowRight size={17}/></>}
+              </>}
+              <InlineError error={error}/>
+              <button type="submit" disabled={busy !== '' || (isRegister && signupStep === 2 && otpEnabled === null)} className="auth-primary-button">
+                {busy === 'account' ? <Loader2 size={18} className="animate-spin"/> : <>{!isRegister ? 'Sign In' : signupStep === 1 ? 'Next' : 'Create Account'}{isRegister && signupStep === 1 && <ArrowRight size={19}/>}</>}
               </button>
-            </div> : <button type="submit" disabled={busy !== ''} className="primary-button mt-2 flex min-h-[48px] w-full justify-center">
-              {busy === 'account' ? <Loader2 size={18} className="animate-spin"/> : <>{isRegister ? 'Continue' : 'Sign in'}<ArrowRight size={17}/></>}
-            </button>}
-          </form>
-          <div className="mt-6 border-t border-[#e2e8f0] pt-5 text-center text-[13px] text-[#64748b]">
-            {isRegister ? <>Already have an account? <button type="button" onClick={() => switchScreen('login')} className="font-bold text-[#1d4ed8] underline-offset-4 hover:underline">Sign in</button></>
-              : <>New to StudyMate? <button type="button" onClick={() => switchScreen('register')} className="font-bold text-[#1d4ed8] underline-offset-4 hover:underline">Create an account</button></>}
+            </form>
+            {!isRegister && <p className="auth-switch">Don't have an account? <button type="button" onClick={() => switchScreen('register')}>Create an account</button></p>}
+            {isRegister && signupStep === 2 && <button className="auth-back-link" type="button" onClick={previousStep}>Back to student details</button>}
           </div>
-          <p className="mt-5 text-center text-[11px] leading-5 text-[#94a3b8]">AI can make mistakes. Check important answers with your teacher or textbook.</p>
+          {isRegister && <p className="auth-register-switch">Already have an account? <button type="button" onClick={() => switchScreen('login')}>Sign in</button></p>}
         </div>
       </section>
     </div>
   );
+
 }
 
 function ProfileModal({ user, token, onClose, onUpdate }) {
@@ -441,19 +451,102 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported] = useState(() => typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
+  const speechRef = useRef(null);
   const activeRef = useRef(null);
   const busyRef = useRef(false);
   const requestRef = useRef(0);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  // Browser SpeechRecognition sends recognized words to the input only; the student chooses when to send.
+  // This requires HTTPS (or localhost) and microphone permission. Browser support varies.
+  useEffect(() => () => {
+    if (speechRef.current) {
+      const recognition = speechRef.current;
+      speechRef.current = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.abort();
+    }
+  }, []);
+  function stopVoice() {
+    const recognition = speechRef.current;
+    speechRef.current = null;
+    if (recognition) {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+    }
+    setListening(false);
+  }
+  function toggleVoice() {
+    if (speechRef.current) { stopVoice(); return; }
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setError('Voice typing is not supported in this browser. Please use Chrome on Android or a compatible browser.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      setError('Voice typing requires HTTPS or localhost. Please open the secure version of StudyMate.');
+      return;
+    }
+    setError('');
+    const recognition = new Recognition();
+    recognition.lang = user.language === 'Hindi' ? 'hi-IN' : 'en-IN';
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 1;
+    const existingText = question.trim();
+    recognition.onresult = event => {
+      if (speechRef.current !== recognition) return;
+      let words = '';
+      for (let i = 0; i < event.results.length; i += 1) {
+        words += `${event.results[i][0].transcript} `;
+      }
+      const combined = [existingText, words.trim()].filter(Boolean).join(' ').slice(0, 2000);
+      setQuestion(combined);
+    };
+    recognition.onerror = event => {
+      if (speechRef.current !== recognition) return;
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed')
+        setError('Microphone access was denied. Allow microphone permission in your browser and try again.');
+      else if (event.error === 'audio-capture')
+        setError('No microphone was detected. Check your device microphone and try again.');
+      else if (event.error === 'network')
+        setError('Voice recognition needs a network connection. Please try again.');
+      else if (event.error !== 'aborted' && event.error !== 'no-speech')
+        setError('Voice typing stopped unexpectedly. Please try again.');
+      speechRef.current = null;
+      setListening(false);
+    };
+    recognition.onend = () => {
+      if (speechRef.current === recognition) {
+        speechRef.current = null;
+        setListening(false);
+      }
+    };
+    try {
+      speechRef.current = recognition;
+      recognition.start();
+      setListening(true);
+    } catch {
+      speechRef.current = null;
+      setListening(false);
+      setError('Unable to start microphone recognition. Check browser permission and try again.');
+    }
+  }
   useEffect(() => { request('/conversations', {token}).then(setConversations).catch(err => setError(err.message)); }, [token]);
   useEffect(() => {scrollRef.current?.scrollIntoView({behavior:'smooth'});}, [messages,sending]);
   async function refresh() { setConversations(await request('/conversations', {token})); }
-  function newChat() { if (busyRef.current) return; requestRef.current += 1; activeRef.current = null; setActiveId(null); setMessages([]); setQuestion(''); setError(''); setSidebarOpen(false); inputRef.current?.focus(); }
-  async function openChat(id) { if (busyRef.current) return; const ticket=++requestRef.current; activeRef.current=id; setActiveId(id); setSidebarOpen(false); setMessages([]); setError(''); setLoadingChat(true); try {const chat=await request(`/conversations/${id}`,{token}); if(ticket===requestRef.current)setMessages(chat.messages);} catch(err){if(ticket===requestRef.current)setError(err.message);} finally{if(ticket===requestRef.current)setLoadingChat(false);} }
+  function newChat() { if (busyRef.current) return; stopVoice(); requestRef.current += 1; activeRef.current = null; setActiveId(null); setMessages([]); setQuestion(''); setError(''); setSidebarOpen(false); inputRef.current?.focus(); }
+  async function openChat(id) { if (busyRef.current) return; stopVoice(); const ticket=++requestRef.current; activeRef.current=id; setActiveId(id); setSidebarOpen(false); setMessages([]); setError(''); setLoadingChat(true); try {const chat=await request(`/conversations/${id}`,{token}); if(ticket===requestRef.current)setMessages(chat.messages);} catch(err){if(ticket===requestRef.current)setError(err.message);} finally{if(ticket===requestRef.current)setLoadingChat(false);} }
   async function deleteChat(id) { if(busyRef.current || !window.confirm('Delete this conversation?'))return; try{await request(`/conversations/${id}`,{token,method:'DELETE'});if(activeRef.current===id)newChat();await refresh();}catch(err){setError(err.message);} }
   async function send(text=question) {
     const clean=text.trim(); if(!clean || busyRef.current || loadingChat)return;
+    if (speechRef.current) stopVoice();
     busyRef.current=true;setSending(true);setError('');setQuestion('');
     const optimistic={id:`temp_${Date.now()}`,role:'user',content:clean};setMessages(old=>[...old,optimistic]);
     try{
@@ -465,37 +558,63 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
     }catch(err){setMessages(old=>old.filter(m=>m.id!==optimistic.id));setQuestion(clean);setError(err.message);}
     finally{busyRef.current=false;setSending(false);inputRef.current?.focus();}
   }
-  const subjects=['Mathematics','Science','Social Science','English'];
-  return <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-[#f8fafc]">
+  const subjects = [
+    { name: 'Maths', Icon: Calculator, color: 'green', question: 'How do I solve fractions?' },
+    { name: 'Science', Icon: FlaskConical, color: 'blue', question: 'Explain photosynthesis' },
+    { name: 'English', Icon: BookOpen, color: 'purple', question: 'How can I improve my English writing?' },
+    { name: 'Social Studies', Icon: Globe2, color: 'orange', question: 'Why do we study history?' },
+  ];
+  const firstName = user.full_name?.trim().split(/\s+/)[0] || 'there';
+  const initials = (user.full_name || 'S').trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join('');
+  const emptyChat = messages.length === 0 && !sending;
+  return <div className="studymate-app flex h-[100dvh] min-h-0 overflow-hidden bg-[#f8fafc]">
     <Sidebar user={user} conversations={conversations} activeId={activeId} visible={sidebarOpen} close={()=>setSidebarOpen(false)} onNew={newChat} onOpen={openChat} onDelete={deleteChat} onSettings={()=>{setSidebarOpen(false);setSettingsOpen(true);}} onLogout={onLogout}/>
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-4 sm:px-8">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3"><button className="rounded-md p-2 text-[#334155] hover:bg-slate-100 md:hidden" onClick={()=>setSidebarOpen(true)} aria-label="Open menu"><Menu size={22}/></button><img src="/studymate-logo.svg" alt="" className="h-8 w-8 shrink-0 md:hidden"/><div><h1 className="font-display text-[15px] font-extrabold tracking-[-.02em] text-[#0f172a] sm:text-[17px]"><span className="md:hidden">StudyMate</span><span className="hidden md:inline">Study desk</span></h1><p className="hidden text-[12px] text-[#94a3b8] sm:block">A quiet place to understand something new.</p></div></div>
-        <button onClick={()=>setSettingsOpen(true)} className="flex shrink-0 items-center gap-2 rounded-lg border border-[#dbeafe] bg-[#eff6ff] px-3 py-2 text-[12px] font-bold text-[#1d4ed8] hover:bg-[#dbeafe]"><GraduationCap size={16}/> Class {user.grade}<span className="hidden text-[#93c5fd] sm:inline">/</span><span className="hidden sm:inline">{user.board}</span></button>
+      <header className="study-header">
+        <button className="study-header-menu md:hidden" type="button" onClick={()=>setSidebarOpen(true)} aria-label="Open menu"><Menu size={23}/></button>
+        <div className="study-header-brand"><Brand/></div>
+        <button type="button" onClick={()=>setSettingsOpen(true)} className="study-avatar md:hidden" aria-label="Open your profile">{initials}</button>
+        <button onClick={()=>setSettingsOpen(true)} className="study-desktop-profile hidden md:flex"><GraduationCap size={16}/> Class {user.grade} · {user.board}</button>
       </header>
-      <main className="relative flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto" aria-live="polite">
-          <div className="mx-auto flex min-h-full w-full max-w-[900px] flex-col px-4 pb-6 pt-6 sm:px-8 sm:pt-10">
-            {loadingChat ? <div className="flex flex-1 items-center justify-center text-[#2563eb]"><Loader2 className="animate-spin" size={27}/></div> : messages.length===0 && !sending ?
-            <div className="my-auto py-8 sm:py-12">
-              <div className="mb-7 flex h-14 w-14 items-center justify-center rounded-xl border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={27}/></div>
-              <div className="mb-3 inline-flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-[#2563eb]"><span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]"/> Your Class {user.grade} study companion</div>
-              <h2 className="font-display max-w-[700px] text-[clamp(30px,3.8vw,47px)] font-extrabold leading-[1.14] tracking-[-.055em] text-[#0f172a]">What would you like to <span className="text-[#2563eb]">understand today?</span></h2>
-              <p className="mt-4 max-w-[590px] text-[15px] leading-7 text-[#64748b]">Hello, {user.full_name.split(' ')[0]}. Ask a question and explore it with examples, clear explanations, and steps that match your level.</p>
-              <div className="mt-9 flex gap-2 overflow-x-auto pb-2">{subjects.map(item=><span key={item} className="shrink-0 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-xs font-semibold text-[#475569]">{item}</span>)}</div>
-              <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3">{suggestions.map(item=><button type="button" key={item.subject} onClick={()=>send(item.question)} className="study-card group flex min-h-[144px] min-w-0 flex-col items-start justify-between p-3.5 text-left sm:min-h-[126px] sm:p-5">
-                <div className="flex w-full items-center justify-between"><span className="font-mono text-[9px] font-bold text-[#94a3b8] sm:text-[11px]">{item.symbol} / {item.subject.toUpperCase()}</span><ArrowRight size={17} className="text-[#94a3b8] transition group-hover:translate-x-0.5 group-hover:text-[#2563eb]"/></div><div><h3 className="mt-4 font-display text-[13px] font-bold leading-5 text-[#0f172a] sm:text-[15px]">{item.question}</h3><p className="mt-1 text-[11px] text-[#94a3b8] sm:text-xs">{item.subtitle}</p></div></button>)}</div>
-              <p className="mt-7 flex items-center gap-2 text-xs text-[#94a3b8]"><CircleHelp size={15}/> You can ask as many follow-up questions as you need.</p>
-            </div> : <div className="flex flex-col gap-8 pb-10">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="flex items-center gap-3.5"><span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span><span className="inline-flex items-center gap-2 text-sm text-[#64748b]"><Loader2 size={15} className="animate-spin"/> Preparing an explanation for Class {user.grade}...</span></div>}<div ref={scrollRef}/></div>}
+      <main className="study-main relative flex min-h-0 flex-1 flex-col">
+        <div className="study-scroll flex-1 overflow-y-auto" aria-live="polite">
+          <div className={`study-content mx-auto flex min-h-full w-full max-w-[900px] flex-col ${emptyChat ? 'study-content-empty' : ''}`}>
+            {loadingChat ? <div className="flex flex-1 items-center justify-center text-[#2563eb]"><Loader2 className="animate-spin" size={27}/></div> : emptyChat ?
+            <div className="study-welcome">
+              <div className="study-greeting">
+                <h1 className="font-display">Hi, {firstName}! <span aria-hidden="true">👋</span></h1>
+                <p>What would you like to learn today?</p>
+              </div>
+              <div className="study-subjects" aria-label="Quick subjects">
+                {subjects.map(({name, Icon, color, question: example}) => <button type="button" disabled={sending} key={name} className="study-subject-tile" onClick={()=>send(example)}>
+                  <span className={`study-subject-icon subject-${color}`}><Icon size={23}/></span>
+                  <span>{name}</span>
+                </button>)}
+              </div>
+              <div className="study-empty-card">
+                <div className="study-empty-content">
+                  <div className="study-empty-icon"><MessageSquareMore size={27}/></div>
+                  <h2 className="font-display">Ask anything</h2>
+                  <p>Get clear, simple and accurate answers based on your class and syllabus.</p>
+                </div>
+                <div className="study-prompt-chips">
+                  {['What is gravity?', 'Explain photosynthesis', 'How to solve quadratic equations?'].map(item => <button type="button" key={item} onClick={()=>send(item)}>{item}</button>)}
+                </div>
+              </div>
+            </div> : <div className="study-messages flex flex-col gap-8">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="flex items-center gap-3.5"><span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span><span className="inline-flex items-center gap-2 text-sm text-[#64748b]"><Loader2 size={15} className="animate-spin"/> Preparing an explanation for Class {user.grade}...</span></div>}<div ref={scrollRef}/></div>}
           </div>
         </div>
-        <div className="shrink-0 border-t border-[#e2e8f0] bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 sm:px-8 sm:pb-6">
-          <div className="mx-auto max-w-[900px]">{error && <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={15}/></button></div>}
-            <form onSubmit={e=>{e.preventDefault();send();}} className="flex items-end gap-2 rounded-xl border border-[#cbd5e1] bg-[#f8fafc] p-2 focus-within:border-[#2563eb] focus-within:ring-[3px] focus-within:ring-[#dbeafe]">
-              <textarea ref={inputRef} rows={1} maxLength={2000} className="max-h-[140px] min-h-[42px] w-full resize-none bg-transparent px-3 py-2.5 text-[16px] sm:text-[14px] leading-6 text-[#0f172a] outline-none placeholder:text-[#94a3b8]" value={question} onChange={e=>setQuestion(e.target.value)} placeholder={`Ask something from Class ${user.grade}...`} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/>
-              <button aria-label="Send question" type="submit" disabled={!question.trim()||sending||loadingChat} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:bg-[#cbd5e1]"><ArrowUp size={20}/></button>
+        <div className="study-composer-wrap">
+          <div className="study-composer-container">{error && <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={15}/></button></div>}
+            <form onSubmit={e=>{e.preventDefault();send();}} className="study-composer">
+              <button type="button" onClick={toggleVoice} className={`study-mic ${listening ? 'study-mic-active' : ''}`} aria-label={listening ? 'Stop voice typing' : 'Start voice typing'} title={listening ? 'Stop voice typing' : 'Speak your question'} aria-pressed={listening}>
+                {listening ? <MicOff size={21}/> : <Mic size={21}/>}
+              </button>
+              <span className="study-composer-separator" aria-hidden="true"/>
+              <textarea ref={inputRef} rows={1} maxLength={2000} className="study-composer-input" value={question} onChange={e=>setQuestion(e.target.value)} placeholder={listening ? 'Listening… speak now' : 'Type or speak your question...'} aria-label="Your question" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/>
+              <button aria-label="Send question" type="submit" disabled={!question.trim()||sending||loadingChat} className="study-send"><ArrowRight size={23}/></button>
             </form>
-            <p className="mt-2.5 text-center text-[11px] leading-5 text-[#94a3b8]">StudyMate can make mistakes. For important topics, confirm with your textbook or teacher.</p>
+            <p className={`study-composer-caption ${listening ? 'is-listening' : ''}`} role="status">{listening ? 'Listening… tap the microphone to stop. Review your words before sending.' : !voiceSupported ? 'Voice typing is unavailable in this browser. You can still type your question.' : 'StudyMate gives answers based on your class and board.'}</p>
           </div>
         </div>
       </main>
@@ -503,7 +622,6 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
     {settingsOpen && <ProfileModal user={user} token={token} onClose={()=>setSettingsOpen(false)} onUpdate={onUpdateUser}/>}
   </div>;
 }
-
 export default function App() {
   // Keep the legacy token key so existing students stay signed in after rebranding.
   const [token, setToken] = useState(() => localStorage.getItem('classwise_token')||'');

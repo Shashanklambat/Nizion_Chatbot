@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -164,7 +164,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     username = data.username.strip().lower()
-    user = db.scalar(select(User).where(User.username == username))
+    user = db.scalar(select(User).where(or_(User.username == username, User.email == username)))
     if user is None or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     return {"access_token": create_token(user.id), "student": user}
