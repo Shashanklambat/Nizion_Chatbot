@@ -1,0 +1,27 @@
+# Render Blueprint: ONE Docker Web Service for frontend and backend.
+services:
+  - type: web
+    name: studymate
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b
+      # Temporary test mode ONLY; change to true before public use.
+      - key: WHATSAPP_OTP_ENABLED
+        value: "false"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      # When turning WhatsApp OTP ON, add the META_WA_* settings
+      # as secret environment variables in the Render dashboard.
