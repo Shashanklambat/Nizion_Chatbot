@@ -11,7 +11,7 @@ button:disabled {cursor:not-allowed;opacity:.6;}
 :focus-visible {outline:3px solid #93c5fd;outline-offset:3px;}
 ::selection {background:#dbeafe;color:#1e3a8a;}
 .font-display {font-family:'Plus Jakarta Sans','Inter',sans-serif;}
-.brand-mark {height:39px;width:39px;display:inline-flex;align-items:center;justify-content:center;color:#2563eb;border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;}
+.brand-symbol {height:42px;width:42px;display:block;flex-shrink:0;object-fit:contain;}
 .auth-editorial {background:linear-gradient(180deg,#f1f6ff 0%,#f8fafc 75%);}
 .auth-editorial::before {content:'';position:absolute;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(#a8c4e633 1px,transparent 1px),linear-gradient(90deg,#a8c4e633 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000,transparent 80%);}
 .learning-note {border:1px solid #dbeafe;border-radius:12px;box-shadow:0 9px 25px rgba(30,64,175,.045);}
@@ -60,10 +60,38 @@ button:disabled {cursor:not-allowed;opacity:.6;}
 .auth-right .primary-button,.auth-right .secondary-button {min-height:44px;}
 @media (max-width:639px) {
   .auth-right {justify-content:flex-start;}
-  .auth-right .brand-mark {height:36px;width:36px;}
+  .auth-right .brand-symbol {height:38px;width:38px;}
   .auth-right form {margin-top:2px;}
 }
 @media (max-width:359px) {
-  .auth-right {padding-left:16px;padding-right:16px;}
+  .auth-right {padding-left:24px;padding-right:24px;}
   .auth-right .form-input {padding-left:10px;padding-right:8px;}
 }
+
+/* Mobile number: inline country picker and strictly ten-digit local input. */
+.phone-wrapper {position:relative;min-width:0;}
+.phone-control {display:flex;align-items:center;width:100%;min-width:0;height:48px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;transition:border-color .15s,box-shadow .15s;}
+.phone-control:focus-within {border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe;}
+.phone-control.phone-control-invalid {border-color:#ef4444;box-shadow:0 0 0 3px #fee2e2;}
+.phone-country-trigger {display:flex;align-items:center;gap:5px;flex:none;min-width:103px;height:100%;padding:0 10px;border:0;background:transparent;color:#0f172a;font-size:14px;font-weight:600;white-space:nowrap;}
+.phone-country-trigger:hover {background:#eff6ff;border-radius:8px 0 0 8px;}
+.phone-country-trigger:focus-visible {outline:2px solid #93c5fd;outline-offset:-3px;}
+.phone-flag {font-size:22px;line-height:1;white-space:nowrap;}
+.phone-chevron {margin-left:auto;color:#64748b;}
+.phone-separator {height:23px;width:1px;background:#e2e8f0;flex:none;}
+.phone-number-input {display:block;width:100%;min-width:0;flex:1;height:100%;padding:0 10px;border:0;background:transparent;color:#0f172a;font-size:16px;letter-spacing:.025em;outline:0;}
+.phone-number-input::placeholder {color:#94a3b8;font-size:14px;letter-spacing:0;}
+.phone-check {flex:none;margin-right:12px;color:#059669;}
+.country-picker {position:absolute;top:calc(100% + 7px);left:0;width:100%;min-width:0;z-index:50;overflow:hidden;border:1px solid #dbe2ed;border-radius:10px;background:#fff;box-shadow:0 15px 35px rgba(15,23,42,.14);}
+.country-search {display:flex;align-items:center;gap:9px;padding:9px 13px;color:#64748b;border-bottom:1px solid #e2e8f0;}
+.country-search input {min-width:0;width:100%;height:30px;border:0;background:transparent;outline:0;color:#0f172a;font-size:14px;}
+.country-search input::placeholder {color:#94a3b8;}
+.country-options {max-height:210px;overflow-y:auto;overscroll-behavior:contain;padding:5px 0;}
+.country-option {display:flex;align-items:center;width:100%;min-height:43px;gap:10px;padding:7px 13px;text-align:left;color:#334155;font-size:13.5px;}
+.country-option:hover,.country-option:focus-visible,.country-option-selected {background:#eff6ff;}
+.country-option-name {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.country-dial {flex:none;color:#64748b;border:1px solid #e2e8f0;border-radius:100px;padding:3px 6px;font-size:11px;}
+.country-empty {padding:14px;text-align:center;font-size:13px;color:#64748b;}
+.password-input {padding-right:47px!important;}
+.password-visibility {position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;height:40px;width:40px;border-radius:8px;color:#64748b;}
+.password-visibility:hover {background:#eff6ff;color:#1d4ed8;}

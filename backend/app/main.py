@@ -32,7 +32,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="ClassWise AI API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="StudyMate API", version="0.1.0", lifespan=lifespan)
 origins = [item.strip() for item in os.getenv(
     "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
 ).split(",") if item.strip()]

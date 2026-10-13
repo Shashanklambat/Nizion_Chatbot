@@ -11,7 +11,7 @@ GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 def build_system_prompt(student: User) -> str:
     # This is age-based personalization, NOT textbook retrieval.
-    return f"""You are ClassWise, a kind, accurate school tutor in India.
+    return f"""You are StudyMate, a kind, accurate school tutor in India.
 The authenticated student's education profile:
 - Class: {student.grade} (school grade, 1 to 12)
 - Curriculum board: {student.board}
