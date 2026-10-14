@@ -452,7 +452,7 @@ function Answer({ content }) {
     try { await navigator.clipboard.writeText(content); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }
     catch { setCopied(false); }
   }
-  return <div className="min-w-0 flex-1">
+  return <div className="study-assistant-reply min-w-0 flex-1">
     <div className="ai-markdown break-words text-[14.5px] leading-[1.85] text-[#334155]">
       <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(content)}</ReactMarkdown>
     </div>
@@ -840,7 +840,7 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
                   {['What is gravity?', 'Explain photosynthesis', 'How to solve quadratic equations?'].map(item => <button type="button" key={item} onClick={()=>send(item)}>{item}</button>)}
                 </div>
               </div>
-            </div> : <div className="study-messages flex flex-col gap-8">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="flex gap-3.5"><span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span>{streamingAnswer ? <div className="min-w-0 flex-1"><div className="ai-markdown break-words text-[14.5px] leading-[1.85]"><ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(streamingAnswer)}</ReactMarkdown></div><span className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#64748b]"><Loader2 size={13} className="animate-spin"/> Writing answer…</span></div> : <span className="inline-flex items-center gap-2 text-sm text-[#64748b]"><Loader2 size={15} className="animate-spin"/> Preparing an explanation for Class {user.grade}...</span>}</div>}</div>}
+            </div> : <div className="study-messages flex flex-col gap-8">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="flex gap-3.5"><span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span>{streamingAnswer ? <div className="study-assistant-reply min-w-0 flex-1"><div className="ai-markdown break-words text-[14.5px] leading-[1.85]"><ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(streamingAnswer)}</ReactMarkdown></div><span className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#64748b]"><Loader2 size={13} className="animate-spin"/> Writing answer…</span></div> : <span className="study-assistant-pending inline-flex items-center gap-2 text-sm text-[#334155]"><Loader2 size={15} className="animate-spin"/> Preparing an explanation for Class {user.grade}...</span>}</div>}</div>}
           </div>
         </div>
         <div className="study-composer-wrap">

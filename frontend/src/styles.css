@@ -333,3 +333,31 @@ button:disabled {cursor:not-allowed;opacity:.6;}
 .study-confirm-accept.is-danger {background: #dc2626;}
 .study-confirm-accept.is-danger:hover {background: #b91c1c;}
 .study-confirm-actions button:disabled {opacity: .65; cursor: not-allowed;}
+
+/* Readable white response surface: same styling for saved and streaming AI messages. */
+.study-assistant-reply {
+  width: 100%;
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.045);
+  color: #0f172a;
+}
+.study-assistant-reply .ai-markdown { color: #0f172a; }
+.study-assistant-pending {
+  min-width: 0;
+  max-width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.045);
+}
+@media (max-width: 480px) {
+  .study-assistant-reply, .study-assistant-pending {
+    padding: 12px 13px;
+    border-radius: 14px;
+  }
+}
