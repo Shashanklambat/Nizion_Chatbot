@@ -452,17 +452,22 @@ function Answer({ content }) {
     try { await navigator.clipboard.writeText(content); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }
     catch { setCopied(false); }
   }
-  return <div className="study-assistant-reply min-w-0 flex-1">
-    <div className="ai-markdown break-words text-[14.5px] leading-[1.85] text-[#334155]">
+  return <div className="study-assistant-reply">
+    <div className="study-assistant-heading"><img src="/studymate-logo.svg" alt="" aria-hidden="true"/><span>StudyMate</span></div>
+    <div className="ai-markdown">
       <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(content)}</ReactMarkdown>
     </div>
-    <button type="button" onClick={copy} title="Copy answer" className="mt-3 inline-flex items-center gap-1.5 rounded-md p-1.5 text-xs font-semibold text-[#94a3b8] transition hover:bg-[#eff6ff] hover:text-[#2563eb]">{copied ? <Check size={15}/> : <Clipboard size={15}/>} {copied ? 'Copied' : 'Copy answer'}</button>
+    <div className="study-answer-actions">
+      <button type="button" onClick={copy} title="Copy answer" aria-label={copied ? 'Answer copied' : 'Copy answer'}>
+        {copied ? <Check size={16}/> : <Clipboard size={16}/>}<span>{copied ? 'Copied' : 'Copy'}</span>
+      </button>
+    </div>
   </div>;
 }
 function MessageBubble({ message }) {
   const mine = message.role === 'user';
-  if (mine) return <div className="flex justify-end"><div className="max-w-[min(92%,730px)] whitespace-pre-wrap break-words rounded-xl rounded-tr-sm bg-[#eff6ff] px-4 py-3.5 text-[14px] leading-6 text-[#1e3a8a]">{message.content}</div></div>;
-  return <div className="flex gap-3.5"><span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span><Answer content={message.content}/></div>;
+  if (mine) return <div className="study-message study-message--user"><div className="study-user-bubble">{message.content}</div></div>;
+  return <div className="study-message study-message--assistant"><Answer content={message.content}/></div>;
 }
 function Sidebar({ user, conversations, activeId, onNew, onOpen, onDelete, onSettings, onLogout, visible, close }) {
   return <>
@@ -570,6 +575,7 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   const busyRef = useRef(false);
   const requestRef = useRef(0);
   const studyScrollRef = useRef(null);
+  const keepAtBottomRef = useRef(true);
   const navStateRef = useRef({ page: 'home', id: null, sidebar: false, profile: false });
   const allowExitRef = useRef(false);
   const chatHistoryInitialized = useRef(false);
@@ -719,10 +725,21 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
     }
   }
   useEffect(() => { request('/conversations', {token}).then(setConversations).catch(err => setError(err.message)); }, [token]);
-  useEffect(() => { const box = studyScrollRef.current; if (box) box.scrollTop = box.scrollHeight; }, [messages, sending, streamingAnswer]);
+  // Follow new messages only while the reader is near the bottom. Do not interrupt
+  // someone scrolling up to read an earlier explanation during streaming.
+  useEffect(() => {
+    const box = studyScrollRef.current;
+    if (box && keepAtBottomRef.current) box.scrollTop = box.scrollHeight;
+  }, [messages, sending, streamingAnswer]);
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = `${Math.min(field.scrollHeight, 128)}px`;
+  }, [question]);
   async function refresh() { setConversations(await request('/conversations', {token})); }
-  function newChat() { if (busyRef.current) return; stopVoice(); requestRef.current += 1; activeRef.current = null; setActiveId(null); setMessages([]); setQuestion(''); setError(''); setStreamingAnswer(''); goTo('home'); }
-  async function loadConversation(id) { stopVoice(); const ticket=++requestRef.current; activeRef.current=id;setActiveId(id);setMessages([]);setStreamingAnswer('');setError('');setLoadingChat(true);try{const chat=await request(`/conversations/${id}`,{token});if(ticket===requestRef.current)setMessages(chat.messages);}catch(err){if(ticket===requestRef.current)setError(err.message);}finally{if(ticket===requestRef.current)setLoadingChat(false);} }
+  function newChat() { if (busyRef.current) return; keepAtBottomRef.current = true; stopVoice(); requestRef.current += 1; activeRef.current = null; setActiveId(null); setMessages([]); setQuestion(''); setError(''); setStreamingAnswer(''); goTo('home'); }
+  async function loadConversation(id) { keepAtBottomRef.current = true; stopVoice(); const ticket=++requestRef.current; activeRef.current=id;setActiveId(id);setMessages([]);setStreamingAnswer('');setError('');setLoadingChat(true);try{const chat=await request(`/conversations/${id}`,{token});if(ticket===requestRef.current)setMessages(chat.messages);}catch(err){if(ticket===requestRef.current)setError(err.message);}finally{if(ticket===requestRef.current)setLoadingChat(false);} }
   async function openChat(id) { if(busyRef.current)return;goTo('conversation',id);await loadConversation(id); }
   function requestDeleteChat(id) {
     if (busyRef.current || confirmationBusyRef.current) return;
@@ -779,6 +796,7 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   async function send(text=question) {
     const clean=text.trim(); if(!clean || busyRef.current || loadingChat)return;
     if (speechRef.current) stopVoice();
+    keepAtBottomRef.current = true;
     busyRef.current=true;setSending(true);setError('');setQuestion('');setStreamingAnswer('');
     if (window.innerWidth < 768) inputRef.current?.blur();
     const optimistic={id:`temp_${Date.now()}`,role:'user',content:clean};
@@ -807,16 +825,21 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
   ];
   const firstName = user.full_name?.trim().split(/\s+/)[0] || 'there';
   const emptyChat = messages.length === 0 && !sending;
-  return <div className="studymate-app flex h-[100dvh] min-h-0 overflow-hidden bg-[#f8fafc]">
+  const conversationOpen = !emptyChat || loadingChat || activeId !== null;
+  return <div className={`studymate-app flex h-[100dvh] min-h-0 overflow-hidden ${conversationOpen ? 'studymate-app--conversation' : ''}`}>
     <Sidebar user={user} conversations={conversations} activeId={activeId} visible={sidebarOpen} close={dismissOverlay} onNew={newChat} onOpen={openChat} onDelete={requestDeleteChat} onSettings={showProfile} onLogout={requestLogout}/>
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="study-header">
         <button className="study-header-menu md:hidden" type="button" onClick={showSidebar} aria-label="Open menu"><Menu size={23}/></button>
         <div className="study-header-brand"><Brand/></div>
-        <span className="study-header-spacer md:hidden" aria-hidden="true"/>
+        {conversationOpen ? <button type="button" className="study-header-new" onClick={newChat} disabled={sending || loadingChat} title="New chat" aria-label="Start a new chat"><Plus size={21}/></button>
+          : <span className="study-header-spacer md:hidden" aria-hidden="true"/>}
       </header>
       <main className="study-main relative flex min-h-0 flex-1 flex-col">
-        <div ref={studyScrollRef} className="study-scroll flex-1 overflow-y-auto" aria-live="polite">
+        <div ref={studyScrollRef} className="study-scroll flex-1 overflow-y-auto" aria-label="Conversation" onScroll={event => {
+          const box = event.currentTarget;
+          keepAtBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 140;
+        }}>
           <div className={`study-content mx-auto flex min-h-full w-full max-w-[900px] flex-col ${emptyChat ? 'study-content-empty' : ''}`}>
             {loadingChat ? <div className="flex flex-1 items-center justify-center text-[#2563eb]"><Loader2 className="animate-spin" size={27}/></div> : emptyChat ?
             <div className="study-welcome">
@@ -840,7 +863,7 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
                   {['What is gravity?', 'Explain photosynthesis', 'How to solve quadratic equations?'].map(item => <button type="button" key={item} onClick={()=>send(item)}>{item}</button>)}
                 </div>
               </div>
-            </div> : <div className="study-messages flex flex-col gap-8">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="flex gap-3.5"><span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"><BookOpen size={17}/></span>{streamingAnswer ? <div className="study-assistant-reply min-w-0 flex-1"><div className="ai-markdown break-words text-[14.5px] leading-[1.85]"><ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(streamingAnswer)}</ReactMarkdown></div><span className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#64748b]"><Loader2 size={13} className="animate-spin"/> Writing answer…</span></div> : <span className="study-assistant-pending inline-flex items-center gap-2 text-sm text-[#334155]"><Loader2 size={15} className="animate-spin"/> Preparing an explanation for Class {user.grade}...</span>}</div>}</div>}
+            </div> : <div className="study-messages" role="log" aria-label="Chat messages">{messages.map(m=><MessageBubble key={m.id} message={m}/>)}{sending && <div className="study-message study-message--assistant"><div className="study-assistant-reply"><div className="study-assistant-heading"><img src="/studymate-logo.svg" alt="" aria-hidden="true"/><span>StudyMate</span></div>{streamingAnswer ? <div className="ai-markdown"><ReactMarkdown remarkPlugins={[remarkGfm,remarkMath]} rehypePlugins={[rehypeKatex]}>{normalizeStudyMarkdown(streamingAnswer)}</ReactMarkdown></div> : <div className="study-assistant-pending"><Loader2 size={16} className="animate-spin"/> Thinking about your question…</div>}<span className="study-streaming-status"><span className="study-streaming-dot"/> {streamingAnswer ? 'Writing answer…' : 'Preparing response…'}</span></div></div>}</div>}
           </div>
         </div>
         <div className="study-composer-wrap">
@@ -851,9 +874,9 @@ function ChatScreen({ user, token, onUpdateUser, onLogout }) {
               </button>
               <span className="study-composer-separator" aria-hidden="true"/>
               <textarea ref={inputRef} rows={1} maxLength={2000} className="study-composer-input" value={question} onChange={e=>setQuestion(e.target.value)} placeholder={listening ? 'Listening… speak now' : 'Type or speak your question...'} aria-label="Your question" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/>
-              <button aria-label="Send question" type="submit" disabled={!question.trim()||sending||loadingChat} className="study-send"><ArrowRight size={23}/></button>
+              <button aria-label="Send question" type="submit" disabled={!question.trim()||sending||loadingChat} className="study-send"><ArrowUp size={20}/></button>
             </form>
-            <p className={`study-composer-caption ${listening ? 'is-listening' : ''}`} role="status">{listening ? 'Listening… tap the microphone to stop. Review your words before sending.' : !voiceSupported ? 'Voice typing is unavailable in this browser. You can still type your question.' : 'StudyMate gives answers based on your class and board.'}</p>
+            {(listening || !voiceSupported || !conversationOpen) && <p className={`study-composer-caption ${listening ? 'is-listening' : ''}`} role="status">{listening ? 'Listening… tap the microphone to stop. Review your words before sending.' : !voiceSupported ? 'Voice typing is unavailable in this browser. You can still type your question.' : 'StudyMate gives answers based on your class and board.'}</p>}
           </div>
         </div>
       </main>
