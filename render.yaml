@@ -16,7 +16,7 @@ services:
         value: openai/gpt-oss-20b
       # Temporary test mode ONLY; change to true before public use.
       - key: WHATSAPP_OTP_ENABLED
-        value: "false"
+        value: false
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
